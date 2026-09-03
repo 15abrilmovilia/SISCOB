@@ -13,7 +13,9 @@ import {
   FileText,
   BadgeAlert,
   ArrowLeft,
-  Landmark
+  Landmark,
+  Calendar,
+  Edit3
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { registrarCobranzaAPI, anularCobranzaAPI } from '../utils/api';
@@ -76,6 +78,15 @@ export default function CobranzasPage({
   // Caja seleccionada para el depósito (5 Cajas oficiales)
   const [selectedCajaId, setSelectedCajaId] = useState('c1');
 
+  // Fecha y comprobante de operación (soporta fecha real de depósito bancario)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [fechaCobro, setFechaCobro] = useState(todayStr);
+  const [metodoPago, setMetodoPago] = useState('Efectivo');
+  const [nroTransaccion, setNroTransaccion] = useState('');
+
+  // Estado para corrección de fecha en recibos emitidos
+  const [editingReceiptDate, setEditingReceiptDate] = useState(null);
+
   // Search in Historial
   const [historialSearch, setHistorialSearch] = useState('');
 
@@ -130,9 +141,15 @@ export default function CobranzasPage({
 
     const chosenCaja = cajas.find(c => c.id === selectedCajaId) || cajas[0] || { id: 'c1', nombre: 'CAJA DE FRECUENCIA' };
     const nroRecibo = Math.floor(100000 + Math.random() * 900000);
+
+    const fechaHoraFormateada = fechaCobro === todayStr 
+      ? new Date().toLocaleString('es-BO') 
+      : `${fechaCobro.split('-').reverse().join('/')}, 12:00:00 (Depósito Bancario)`;
+
     const receiptData = {
       nroRecibo,
-      fecha: new Date().toLocaleString('es-BO'),
+      fecha: fechaHoraFormateada,
+      fechaIso: fechaCobro,
       usuario: 'Cajero Central',
       cajero: 'Cajero Central',
       socioId: activeSocio.id,
@@ -142,10 +159,11 @@ export default function CobranzasPage({
       items: selectedItems,
       totalBs,
       totalSus,
-      metodoPago: 'Efectivo',
+      metodoPago,
+      nroTransaccion,
       cajaId: chosenCaja.id,
       cajaNombre: chosenCaja.nombre,
-      observaciones,
+      observaciones: nroTransaccion ? `${observaciones ? observaciones + ' • ' : ''}Doc Banco: ${nroTransaccion}` : observaciones,
       estado: 'VIGENTE',
       deudaIds: [...selectedDeudaIds]
     };
@@ -244,6 +262,32 @@ export default function CobranzasPage({
     }
 
     setAlertMsg(`¡Recibo N° ${recibo.nroRecibo} ANULADO exitosamente! Las deudas fueron restauradas y el dinero descontado de caja.`);
+    setTimeout(() => setAlertMsg(null), 6000);
+  };
+
+  // MODIFICAR FECHA DE OPERACIÓN / DEPÓSITO BANCARIO DE UN RECIBO
+  const handleGuardarCambioFecha = (nroRecibo, nuevaFecha, motivo) => {
+    if (!nuevaFecha) {
+      alert('Por favor seleccione una fecha válida.');
+      return;
+    }
+    const updated = historialRecibos.map(r => {
+      if (r.nroRecibo === nroRecibo) {
+        const fechaDisplay = `${nuevaFecha.split('-').reverse().join('/')}, 12:00:00 (Ajuste Boleta)`;
+        const obsActualizada = `${r.observaciones || ''} [Fecha ajustada a ${nuevaFecha}: ${motivo || 'Verificación boleta bancaria'}]`.trim();
+        return {
+          ...r,
+          fecha: fechaDisplay,
+          fechaIso: nuevaFecha,
+          observaciones: obsActualizada
+        };
+      }
+      return r;
+    });
+    setHistorialRecibos(updated);
+    saveToStorage('siscob_recibos', updated);
+    setEditingReceiptDate(null);
+    setAlertMsg(`¡Fecha del Recibo N° ${nroRecibo} actualizada a ${nuevaFecha} con éxito! Se reflejará en el corte contable correspondiente.`);
     setTimeout(() => setAlertMsg(null), 6000);
   };
 
@@ -487,39 +531,83 @@ export default function CobranzasPage({
           </div>
 
           {/* Observations & Action Buttons */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap justify-between items-center gap-4">
-            
-            {/* Selector de Caja Destino (5 Cajas oficiales) */}
-            <div className="w-full sm:w-auto min-w-[270px]">
-              <label className="block text-xs font-black text-slate-800 mb-1 flex items-center space-x-1.5">
-                <Landmark className="w-4 h-4 text-red-700" />
-                <span>Caja Destino del Cobro:</span>
-              </label>
-              <select
-                value={selectedCajaId}
-                onChange={(e) => setSelectedCajaId(e.target.value)}
-                className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:ring-2 focus:ring-red-500 cursor-pointer shadow-xs"
-              >
-                {cajas.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre} (Saldo: Bs {(c.saldoActual || 0).toFixed(2)})
-                  </option>
-                ))}
-              </select>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Selector de Caja Destino (5 Cajas oficiales) */}
+              <div>
+                <label className="block text-xs font-black text-slate-800 mb-1 flex items-center space-x-1.5">
+                  <Landmark className="w-3.5 h-3.5 text-red-700" />
+                  <span>Caja Destino del Cobro:</span>
+                </label>
+                <select
+                  value={selectedCajaId}
+                  onChange={(e) => setSelectedCajaId(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:ring-2 focus:ring-red-500 cursor-pointer shadow-xs"
+                >
+                  {cajas.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre} (Disp: Bs {(c.saldoActual || 0).toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Selector de Fecha de Cobro / Depósito Bancario */}
+              <div>
+                <label className="block text-xs font-black text-slate-800 mb-1 flex items-center space-x-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-blue-700" />
+                  <span>Fecha Operación / Depósito:</span>
+                </label>
+                <input
+                  type="date"
+                  value={fechaCobro}
+                  onChange={(e) => setFechaCobro(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-xs"
+                  title="Permite registrar depósitos con la fecha real del comprobante bancario"
+                />
+              </div>
+
+              {/* Método de Pago */}
+              <div>
+                <label className="block text-xs font-black text-slate-800 mb-1">
+                  Método de Pago:
+                </label>
+                <select
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-slate-500 cursor-pointer shadow-xs"
+                >
+                  <option value="Efectivo">Efectivo en Ventanilla</option>
+                  <option value="Depósito Bancario">Depósito Bancario (Ventanilla)</option>
+                  <option value="Transferencia QR">Transferencia Bancaria / QR</option>
+                </select>
+              </div>
+
+              {/* N° Transacción / Boleta Banco */}
+              <div>
+                <label className="block text-xs font-black text-slate-800 mb-1">
+                  N° Comprobante / Transacción Banco:
+                </label>
+                <input
+                  type="text"
+                  value={nroTransaccion}
+                  onChange={(e) => setNroTransaccion(e.target.value)}
+                  placeholder="Ej: DEP-8941256..."
+                  className="w-full p-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 shadow-xs"
+                />
+              </div>
             </div>
 
-            <div className="flex-1 min-w-[240px] max-w-md">
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Observaciones del Recibo:
-              </label>
-              <input
-                type="text"
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Ej. Pago correspondiente a aportes del mes..."
-                className="w-full p-2 border border-slate-300 rounded-xl text-xs"
-              />
-            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+              <div className="flex-1 min-w-[240px]">
+                <input
+                  type="text"
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  placeholder="Observaciones adicionales del recibo (opcional)..."
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs"
+                />
+              </div>
 
             <div className="flex items-center space-x-2">
               <button
@@ -544,6 +632,7 @@ export default function CobranzasPage({
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* ========================================================================= */}
@@ -638,14 +727,29 @@ export default function CobranzasPage({
                             </button>
 
                             {!isAnulado ? (
-                              <button
-                                onClick={() => handleAnularRecibo(rec)}
-                                className="flex items-center space-x-1 bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95 shadow-2xs"
-                                title="Anular este recibo por equivocación"
-                              >
-                                <Ban className="w-3 h-3" />
-                                <span>Anular Recibo</span>
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => setEditingReceiptDate({
+                                    recibo: rec,
+                                    newDate: rec.fechaIso || (rec.fecha && rec.fecha.includes('/') ? rec.fecha.split(',')[0].split('/').reverse().join('-') : todayStr),
+                                    motivo: 'Verificación comprobante bancario'
+                                  })}
+                                  className="flex items-center space-x-1 bg-amber-50 hover:bg-amber-100 text-amber-800 px-2.5 py-1 rounded-lg text-xs font-bold border border-amber-300 transition cursor-pointer"
+                                  title="Corregir fecha real del comprobante bancario"
+                                >
+                                  <Calendar className="w-3 h-3 text-amber-600" />
+                                  <span>Fecha</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleAnularRecibo(rec)}
+                                  className="flex items-center space-x-1 bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95 shadow-2xs"
+                                  title="Anular este recibo por equivocación"
+                                >
+                                  <Ban className="w-3 h-3" />
+                                  <span>Anular Recibo</span>
+                                </button>
+                              </>
                             ) : (
                               <span className="text-[10px] text-slate-400 italic">
                                 Revertido
@@ -677,6 +781,78 @@ export default function CobranzasPage({
         onClose={() => setCurrentReceipt(null)}
         printMode={printMode}
       />
+
+      {/* Modal para Corregir Fecha Real de Depósito Bancario */}
+      {editingReceiptDate && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5 space-y-4 border border-slate-200">
+            <div className="flex items-center space-x-2 text-slate-800 border-b pb-3">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              <h3 className="font-black text-sm">CORREGIR FECHA DE DEPÓSITO BANCARIO</h3>
+            </div>
+            
+            <div className="text-xs space-y-1 text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200 font-mono">
+              <p>
+                <strong>Recibo N°:</strong> #{editingReceiptDate.recibo.nroRecibo}
+              </p>
+              <p>
+                <strong>Socio:</strong> {editingReceiptDate.recibo.socioNombre}
+              </p>
+              <p>
+                <strong>Fecha Actual Registrada:</strong> {editingReceiptDate.recibo.fecha}
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Nueva Fecha Real del Depósito Bancario (según comprobante del banco):
+                </label>
+                <input
+                  type="date"
+                  value={editingReceiptDate.newDate}
+                  onChange={(e) => setEditingReceiptDate({ ...editingReceiptDate, newDate: e.target.value })}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Motivo de la Corrección / N° Comprobante Banco:
+                </label>
+                <input
+                  type="text"
+                  value={editingReceiptDate.motivo}
+                  onChange={(e) => setEditingReceiptDate({ ...editingReceiptDate, motivo: e.target.value })}
+                  placeholder="Ej: Depósito realizado el 31/08 según boleta N° 98124..."
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setEditingReceiptDate(null)}
+                className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGuardarCambioFecha(
+                  editingReceiptDate.recibo.nroRecibo, 
+                  editingReceiptDate.newDate, 
+                  editingReceiptDate.motivo
+                )}
+                className="px-4 py-2 text-xs font-black bg-blue-700 hover:bg-blue-800 text-white rounded-xl shadow-xs transition cursor-pointer"
+              >
+                GUARDAR CORRECCIÓN
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
