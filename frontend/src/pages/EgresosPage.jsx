@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { TrendingDown, Plus, FileText, Printer, CheckCircle, Search, User, X } from 'lucide-react';
+import { TrendingDown, Plus, FileText, Printer, CheckCircle, Search, User, X, Trash2 } from 'lucide-react';
 import VoucherModal from '../components/VoucherModal';
-import { createEgresoAPI } from '../utils/api';
+import { createEgresoAPI, deleteEgresoAPI } from '../utils/api';
 
 export default function EgresosPage({ egresos, setEgresos, cajas, setCajas, socios = [] }) {
   const [selectedVoucher, setSelectedVoucher] = useState(null);
@@ -124,6 +124,33 @@ export default function EgresosPage({ egresos, setEgresos, cajas, setCajas, soci
     handleClearSocio();
   };
 
+  // ANULAR / ELIMINAR EGRESO REGISTRADO POR ERROR
+  const handleAnularEgreso = async (eg) => {
+    const confirmar = window.confirm(
+      `¿Está seguro de ANULAR el comprobante de egreso #${eg.nroBoleta || eg.id} por Bs ${parseFloat(eg.monto).toFixed(2)} emitido a ${eg.pagadoA}?\n\n` +
+      `Efecto: El dinero se reintegrará automáticamente a la caja de origen para cuadrar el saldo.`
+    );
+    if (!confirmar) return;
+
+    const montoNum = parseFloat(eg.monto);
+    // 1. Devolver dinero a la Caja
+    setCajas(prev => prev.map(c => 
+      c.id === (eg.cajaId || 'c1')
+        ? { ...c, egresos: Math.max(0, (c.egresos || 0) - montoNum), saldoActual: (c.saldoActual || c.saldoAnterior || 0) + montoNum }
+        : c
+    ));
+
+    // 2. Eliminar del estado local
+    setEgresos(prev => prev.filter(item => (item.id !== eg.id && item.nroBoleta !== eg.nroBoleta)));
+
+    // 3. Eliminar de Supabase
+    if (eg.id) {
+      await deleteEgresoAPI(eg.id);
+    }
+
+    alert(`¡Comprobante de egreso #${eg.nroBoleta || eg.id} anulado! El dinero fue devuelto a la caja.`);
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4 animate-fadeIn">
       {/* Top Header */}
@@ -180,13 +207,24 @@ export default function EgresosPage({ egresos, setEgresos, cajas, setCajas, soci
                   <td className="p-3 font-mono text-slate-600">{eg.fecha}</td>
                   <td className="p-3 font-bold text-slate-500 text-[11px]">{eg.usuario}</td>
                   <td className="p-3 text-center">
-                    <button
-                      onClick={() => setSelectedVoucher(eg)}
-                      className="flex items-center space-x-1 mx-auto bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-200 transition cursor-pointer"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Ver Boleta</span>
-                    </button>
+                    <div className="flex items-center justify-center space-x-1.5">
+                      <button
+                        onClick={() => setSelectedVoucher(eg)}
+                        className="flex items-center space-x-1 bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-200 transition cursor-pointer"
+                        title="Ver comprobante"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Ver Boleta</span>
+                      </button>
+                      <button
+                        onClick={() => handleAnularEgreso(eg)}
+                        className="flex items-center space-x-1 bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-rose-200 transition cursor-pointer active:scale-95"
+                        title="Anular este comprobante y reintegrar dinero a la caja"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Anular</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

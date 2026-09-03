@@ -322,6 +322,50 @@ app.post('/api/cobranzas', async (req, res) => {
   res.status(201).json({ success: true, message: 'Cobranza registrada en memoria.', data: req.body });
 });
 
+// Endpoint para ANULAR / REVERTIR una cobranza errónea
+app.post('/api/cobranzas/anular', async (req, res) => {
+  const { nroRecibo, deudaIds, monto, cajaId } = req.body;
+  if (pool) {
+    try {
+      if (nroRecibo) {
+        await pool.query('DELETE FROM recibos WHERE nro_recibo = $1 OR nro_recibo = $2', [nroRecibo, `REC-${nroRecibo}`]);
+      }
+      if (Array.isArray(deudaIds) && deudaIds.length > 0) {
+        const cleanIds = deudaIds.map(id => typeof id === 'string' ? parseInt(id.replace('d', '')) : id).filter(n => !isNaN(n));
+        if (cleanIds.length > 0) {
+          await pool.query('UPDATE deudas_socio SET pagado = false WHERE id = ANY($1::int[])', [cleanIds]);
+        }
+      }
+      if (monto && cajaId) {
+        await pool.query('UPDATE cajas SET ingresos = GREATEST(0, ingresos - $1), saldo_actual = saldo_actual - $1 WHERE id = $2', [monto, cajaId]);
+      }
+      return res.json({ success: true, message: 'Cobranza revertida y deudas restauradas.' });
+    } catch (err) {
+      console.error('Error al anular cobranza:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true, message: 'Revertido en memoria.' });
+});
+
+// Endpoint para ELIMINAR / ANULAR un egreso
+app.delete('/api/egresos/:id', async (req, res) => {
+  const { id } = req.params;
+  if (pool) {
+    try {
+      const { rows } = await pool.query('DELETE FROM egresos WHERE id = $1 RETURNING *', [id]);
+      if (rows.length > 0) {
+        const e = rows[0];
+        await pool.query('UPDATE cajas SET egresos = GREATEST(0, egresos - $1), saldo_actual = saldo_actual + $1 WHERE id = $2', [e.monto, e.caja_id || 'c1']);
+      }
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true });
+});
+
 // Start Server (using native node execution, no nodemon)
 app.listen(PORT, () => {
   console.log(`[SISCOB API] Servidor activo escuchando en el puerto ${PORT}`);

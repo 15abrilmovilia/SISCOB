@@ -116,3 +116,29 @@ export async function registrarCobranzaAPI(cobranzaData) {
     return null;
   }
 }
+
+export async function anularCobranzaAPI(reversalData) {
+  try {
+    const res = await fetch(`${API_BASE}/api/cobranzas/anular`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reversalData)
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[SISCOB API] Error al anular cobranza remota:', err.message);
+    return false;
+  }
+}
+
+export async function deleteEgresoAPI(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/egresos/${id}`, {
+      method: 'DELETE'
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[SISCOB API] Error al eliminar egreso:', err.message);
+    return false;
+  }
+}
