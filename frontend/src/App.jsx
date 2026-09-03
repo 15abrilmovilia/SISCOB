@@ -1,0 +1,266 @@
+import React, { useState, useEffect } from 'react';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
+import LoginScreen from './components/LoginScreen';
+import ArqueoCajaModal from './components/ArqueoCajaModal';
+import DashboardPage from './pages/DashboardPage';
+import SociosPage from './pages/SociosPage';
+import CuotasPage from './pages/CuotasPage';
+import CobranzasPage from './pages/CobranzasPage';
+import EgresosPage from './pages/EgresosPage';
+import PrestamosPage from './pages/PrestamosPage';
+import WorkflowCierrePage from './pages/WorkflowCierrePage';
+import BalancePage from './pages/BalancePage';
+import AlmacenPage from './pages/AlmacenPage';
+import ReportesPage from './pages/ReportesPage';
+import ConciliacionPage from './pages/ConciliacionPage';
+import AuditoriaPage from './pages/AuditoriaPage';
+import FichaTecnicaPage from './pages/FichaTecnicaPage';
+import ConfigPage from './pages/ConfigPage';
+import NewSocioModal from './components/NewSocioModal';
+
+import { 
+  INITIAL_SOCIOS, 
+  INITIAL_DEUDAS, 
+  INITIAL_CAJAS, 
+  INITIAL_EGRESOS 
+} from './data/mockData';
+
+import { 
+  loadFromStorage, 
+  saveToStorage, 
+  exportBackupData, 
+  importBackupFile, 
+  STORAGE_KEYS 
+} from './utils/storage';
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState(() => 
+    loadFromStorage(STORAGE_KEYS.USER, { id: 'admin33', nombre: 'Administrador Central', rol: 'admin' })
+  );
+
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const [socios, setSocios] = useState(() => loadFromStorage(STORAGE_KEYS.SOCIOS, INITIAL_SOCIOS));
+  const [deudas, setDeudas] = useState(() => loadFromStorage(STORAGE_KEYS.DEUDAS, INITIAL_DEUDAS));
+  const [cajas, setCajas] = useState(() => loadFromStorage(STORAGE_KEYS.CAJAS, INITIAL_CAJAS));
+  const [egresos, setEgresos] = useState(() => loadFromStorage(STORAGE_KEYS.EGRESOS, INITIAL_EGRESOS));
+
+  const [preselectedSocioId, setPreselectedSocioId] = useState(20);
+  const [printMode, setPrintMode] = useState('termico');
+  const [isNewSocioModalOpen, setIsNewSocioModalOpen] = useState(false);
+  const [isArqueoModalOpen, setIsArqueoModalOpen] = useState(false);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.SOCIOS, socios);
+  }, [socios]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.DEUDAS, deudas);
+  }, [deudas]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.CAJAS, cajas);
+  }, [cajas]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.EGRESOS, egresos);
+  }, [egresos]);
+
+  useEffect(() => {
+    if (currentUser) {
+      saveToStorage(STORAGE_KEYS.USER, currentUser);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.USER);
+    }
+  }, [currentUser]);
+
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+  };
+
+  const handleExportBackup = () => {
+    exportBackupData({ socios, deudas, cajas, egresos });
+  };
+
+  const handleImportBackup = (file) => {
+    importBackupFile(
+      file,
+      (imported) => {
+        setSocios(imported.socios);
+        setDeudas(imported.deudas);
+        setCajas(imported.cajas);
+        setEgresos(imported.egresos);
+        alert('Copia de seguridad restaurada exitosamente.');
+      },
+      (error) => {
+        alert(`Error al importar respaldo: ${error}`);
+      }
+    );
+  };
+
+  const handleGoToCobranza = (socioId) => {
+    setPreselectedSocioId(socioId);
+    setActiveTab('cobranzas');
+  };
+
+  const handleSaveSocio = (newData) => {
+    const newId = Math.max(...socios.map(s => s.id), 0) + 1;
+    const newSocio = {
+      id: newId,
+      nombres: newData.nombres,
+      apPaterno: newData.apPaterno,
+      apMaterno: newData.apMaterno,
+      ci: newData.ci,
+      celular: newData.celular,
+      fechaIngreso: newData.fechaIngreso,
+      estado: "VIG",
+      categoria: newData.categoria,
+      observaciones: newData.observaciones || "Nuevo afiliado registrado",
+      acciones: [
+        { id: `10${newId}`, fecha: newData.fechaIngreso, monto: 0.0, estado: "VIG", categoria: newData.categoria }
+      ],
+      obligaciones: []
+    };
+
+    if (newData.cuotaSostenimiento) {
+      newSocio.obligaciones.push({ nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" });
+    }
+    if (newData.cuotaGPS) {
+      newSocio.obligaciones.push({ nombre: "Mantenimiento GPS", monto: 80.0, periodicidad: "Mensual" });
+    }
+
+    setSocios([newSocio, ...socios]);
+  };
+
+  if (!currentUser) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex flex-col text-slate-800">
+      <Sidebar 
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
+        onLogout={handleLogout}
+      />
+
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'lg:pl-64' : 'pl-0'}`}>
+        <Header 
+          toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          printMode={printMode}
+          setPrintMode={setPrintMode}
+          setActiveTab={setActiveTab}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onExportBackup={handleExportBackup}
+          onImportBackup={handleImportBackup}
+          onOpenArqueoModal={() => setIsArqueoModalOpen(true)}
+        />
+
+        <main className="flex-1 py-4">
+          {activeTab === 'dashboard' && (
+            <DashboardPage 
+              setActiveTab={setActiveTab}
+              onOpenNewSocioModal={() => setIsNewSocioModalOpen(true)}
+              cajas={cajas}
+            />
+          )}
+          {activeTab === 'socios' && (
+            <SociosPage 
+              socios={socios} 
+              setSocios={setSocios} 
+              onGoToCobranza={handleGoToCobranza}
+              deudas={deudas}
+            />
+          )}
+          {activeTab === 'cuotas' && (
+            <CuotasPage socios={socios} />
+          )}
+          {activeTab === 'cobranzas' && (
+            <CobranzasPage 
+              socios={socios}
+              deudas={deudas}
+              setDeudas={setDeudas}
+              cajas={cajas}
+              setCajas={setCajas}
+              preselectedSocioId={preselectedSocioId}
+              printMode={printMode}
+            />
+          )}
+          {activeTab === 'egresos' && (
+            <EgresosPage 
+              egresos={egresos}
+              setEgresos={setEgresos}
+              cajas={cajas}
+              setCajas={setCajas}
+            />
+          )}
+          {activeTab === 'prestamos' && (
+            <PrestamosPage />
+          )}
+          {activeTab === 'workflow' && (
+            <WorkflowCierrePage />
+          )}
+          {activeTab === 'balance' && (
+            <BalancePage 
+              cajas={cajas}
+            />
+          )}
+          {activeTab === 'almacen' && (
+            <AlmacenPage />
+          )}
+          {activeTab === 'reportes' && (
+            <ReportesPage socios={socios} deudas={deudas} />
+          )}
+          {activeTab === 'conciliacion' && (
+            <ConciliacionPage 
+              socios={socios}
+              deudas={deudas}
+              setDeudas={setDeudas}
+              cajas={cajas}
+              setCajas={setCajas}
+              currentUser={currentUser}
+            />
+          )}
+          {activeTab === 'auditoria' && (
+            <AuditoriaPage />
+          )}
+          {activeTab === 'ficha' && (
+            <FichaTecnicaPage />
+          )}
+          {activeTab === 'config' && (
+            <ConfigPage 
+              printMode={printMode}
+              setPrintMode={setPrintMode}
+            />
+          )}
+        </main>
+
+        <footer className="bg-white text-slate-400 py-3 text-center text-xs border-t border-slate-200 no-print">
+          <span>RADIO MÓVIL 15 DE ABRIL • <strong>SISCOB</strong> (Sistema de Cobranza de Socios) • Versión 1.0</span>
+        </footer>
+      </div>
+
+      <NewSocioModal 
+        isOpen={isNewSocioModalOpen}
+        onClose={() => setIsNewSocioModalOpen(false)}
+        onSave={handleSaveSocio}
+      />
+
+      <ArqueoCajaModal
+        isOpen={isArqueoModalOpen}
+        onClose={() => setIsArqueoModalOpen(false)}
+        cajas={cajas}
+        currentUser={currentUser}
+      />
+    </div>
+  );
+}
