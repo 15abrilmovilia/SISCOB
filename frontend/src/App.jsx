@@ -240,6 +240,7 @@ export default function App() {
             <ConfigPage 
               printMode={printMode}
               setPrintMode={setPrintMode}
+              currentUser={currentUser}
             />
           )}
         </main>
