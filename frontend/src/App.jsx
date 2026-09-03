@@ -231,14 +231,24 @@ export default function App() {
           )}
           {activeTab === 'egresos' && (
             <EgresosPage 
-              egresos={egresos}
-              setEgresos={setEgresos}
-              cajas={cajas}
-              setCajas={setCajas}
+              egresos={egresos} 
+              setEgresos={setEgresos} 
+              cajas={cajas} 
+              setCajas={setCajas} 
+              socios={socios}
             />
           )}
           {activeTab === 'prestamos' && (
-            <PrestamosPage />
+            <PrestamosPage 
+              socios={socios}
+              cajas={cajas}
+              setCajas={setCajas}
+              egresos={egresos}
+              setEgresos={setEgresos}
+              deudas={deudas}
+              setDeudas={setDeudas}
+              currentUser={currentUser}
+            />
           )}
           {activeTab === 'workflow' && (
             <WorkflowCierrePage />
