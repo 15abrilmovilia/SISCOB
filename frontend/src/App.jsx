@@ -205,6 +205,11 @@ export default function App() {
               setActiveTab={setActiveTab}
               onOpenNewSocioModal={() => setIsNewSocioModalOpen(true)}
               cajas={cajas}
+              socios={socios}
+              deudas={deudas}
+              egresos={egresos}
+              currentUser={currentUser}
+              onGoToCobranza={handleGoToCobranza}
             />
           )}
           {activeTab === 'socios' && (
