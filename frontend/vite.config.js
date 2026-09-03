@@ -35,4 +35,12 @@ export default defineConfig({
       }
     })
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://siscob-production.up.railway.app',
+        changeOrigin: true
+      }
+    }
+  }
 })

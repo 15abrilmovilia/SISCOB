@@ -483,12 +483,27 @@ app.post('/api/sistema/reset', async (req, res) => {
       await pool.query('DELETE FROM recibos');
       await pool.query('DELETE FROM egresos');
       await pool.query('DELETE FROM socios');
+      await pool.query('DELETE FROM auditoria_logs').catch(() => {});
+      
+      // Reiniciar cajas principales con saldos de apertura solicitados
       await pool.query('UPDATE cajas SET saldo_anterior = $1, ingresos = 0, egresos = 0, saldo_actual = $1 WHERE id = $2', [saldoCajaGeneral, 'c1']);
       await pool.query('UPDATE cajas SET saldo_anterior = $1, ingresos = 0, egresos = 0, saldo_actual = $1 WHERE id = $2', [saldoCajaGPS, 'c2']);
-      return res.json({ success: true, message: 'Base de datos reiniciada a cero.' });
+      await pool.query('UPDATE cajas SET saldo_anterior = 0, ingresos = 0, egresos = 0, saldo_actual = 0 WHERE id NOT IN ($1, $2)', ['c1', 'c2']).catch(() => {});
+
+      // Reiniciar secuencias autonuméricas para que los nuevos socios inicien en 1
+      try {
+        await pool.query('ALTER SEQUENCE IF EXISTS socios_id_seq RESTART WITH 1');
+        await pool.query('ALTER SEQUENCE IF EXISTS deudas_socio_id_seq RESTART WITH 1');
+        await pool.query('ALTER SEQUENCE IF EXISTS recibos_id_seq RESTART WITH 1');
+        await pool.query('ALTER SEQUENCE IF EXISTS egresos_id_seq RESTART WITH 1');
+      } catch (seqErr) {
+        console.warn('Reinicio de secuencias advertencia:', seqErr.message);
+      }
+
+      return res.json({ success: true, message: 'Base de datos en Supabase reiniciada a cero con éxito.' });
     } catch (err) {
-      console.error('Error al reiniciar DB:', err);
-      return res.status(500).json({ error: 'Error al reiniciar DB', detail: err.message });
+      console.error('Error al reiniciar DB en Supabase:', err);
+      return res.status(500).json({ error: 'Error al reiniciar DB en Supabase', detail: err.message });
     }
   }
   res.json({ success: true, message: 'Memoria reiniciada a cero.' });

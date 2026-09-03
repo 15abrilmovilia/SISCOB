@@ -20,6 +20,7 @@ export default function ReiniciarSistemaModal({
   const [saldoCajaGPS, setSaldoCajaGPS] = useState('0.00');
   const [confirmWord, setConfirmWord] = useState('');
   const [error, setError] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -29,7 +30,7 @@ export default function ReiniciarSistemaModal({
     setError('');
   };
 
-  const handleProceed = (e) => {
+  const handleProceed = async (e) => {
     e.preventDefault();
     if (!backupDownloaded) {
       setError('Por seguridad, descargue la copia de respaldo antes de reiniciar.');
@@ -44,12 +45,20 @@ export default function ReiniciarSistemaModal({
     const cGeneral = parseFloat(saldoCajaGeneral) || 0;
     const cGPS = parseFloat(saldoCajaGPS) || 0;
 
-    onConfirmReset({
-      saldoCajaGeneral: cGeneral,
-      saldoCajaGPS: cGPS
-    });
-
-    onClose();
+    setIsResetting(true);
+    setError('');
+    try {
+      await onConfirmReset({
+        saldoCajaGeneral: cGeneral,
+        saldoCajaGPS: cGPS
+      });
+      setIsResetting(false);
+      onClose();
+      alert('¡Puesta a Cero completada con éxito! La base de datos en Supabase y el sistema local han quedado completamente en blanco para el nuevo mes.');
+    } catch (err) {
+      setIsResetting(false);
+      setError(`Error al reiniciar en Supabase: ${err.message || 'Verifique la conexión a internet'}`);
+    }
   };
 
   return (
@@ -187,15 +196,24 @@ export default function ReiniciarSistemaModal({
             </button>
             <button
               type="submit"
-              disabled={!backupDownloaded || confirmWord.trim().toUpperCase() !== 'REINICIAR'}
+              disabled={isResetting || !backupDownloaded || confirmWord.trim().toUpperCase() !== 'REINICIAR'}
               className={`px-5 py-2.5 rounded-xl font-black tracking-wide shadow-md flex items-center space-x-2 transition ${
-                backupDownloaded && confirmWord.trim().toUpperCase() === 'REINICIAR'
+                !isResetting && backupDownloaded && confirmWord.trim().toUpperCase() === 'REINICIAR'
                   ? 'bg-red-700 hover:bg-red-800 text-white cursor-pointer shadow-red-700/20'
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
             >
-              <Trash2 className="w-4 h-4" />
-              <span>BORRAR Y EMPEZAR DE CERO</span>
+              {isResetting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                  <span>BORRANDO EN SUPABASE Y SISTEMA...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  <span>BORRAR Y EMPEZAR DE CERO</span>
+                </>
+              )}
             </button>
           </div>
 

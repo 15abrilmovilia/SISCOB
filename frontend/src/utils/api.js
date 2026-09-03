@@ -211,3 +211,22 @@ export async function deleteUsuarioAPI(id) {
     return false;
   }
 }
+
+// 8. Puesta a Cero de Producción en Supabase (Railway)
+export async function resetSistemaAPI({ saldoCajaGeneral = 0, saldoCajaGPS = 0 } = {}) {
+  try {
+    const res = await fetch(`${API_BASE}/api/sistema/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ saldoCajaGeneral, saldoCajaGPS })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || errData.detail || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    console.error('[SISCOB API] Error al reiniciar sistema en Supabase:', err.message);
+    throw err;
+  }
+}

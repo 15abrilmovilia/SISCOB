@@ -27,6 +27,7 @@ import {
   INITIAL_CAJAS, 
   INITIAL_EGRESOS,
   INITIAL_PRESTAMOS,
+  INITIAL_RECIBOS,
   INITIAL_USERS,
   INITIAL_ROLES
 } from './data/mockData';
@@ -46,7 +47,8 @@ import {
   getCajasAPI, 
   getDeudasAPI, 
   getEgresosAPI,
-  getUsuariosAPI
+  getUsuariosAPI,
+  resetSistemaAPI
 } from './utils/api';
 
 export default function App() {
@@ -62,6 +64,7 @@ export default function App() {
   const [cajas, setCajas] = useState(() => loadFromStorage(STORAGE_KEYS.CAJAS, INITIAL_CAJAS));
   const [egresos, setEgresos] = useState(() => loadFromStorage(STORAGE_KEYS.EGRESOS, INITIAL_EGRESOS));
   const [prestamos, setPrestamos] = useState(() => loadFromStorage(STORAGE_KEYS.PRESTAMOS, INITIAL_PRESTAMOS));
+  const [recibos, setRecibos] = useState(() => loadFromStorage(STORAGE_KEYS.RECIBOS, INITIAL_RECIBOS));
   const [usuarios, setUsuarios] = useState(() => loadFromStorage(STORAGE_KEYS.USUARIOS, INITIAL_USERS));
   const [roles, setRoles] = useState(() => loadFromStorage(STORAGE_KEYS.ROLES, INITIAL_ROLES));
 
@@ -69,6 +72,11 @@ export default function App() {
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.PRESTAMOS, prestamos);
   }, [prestamos]);
+
+  // Persistir cambios en recibos
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.RECIBOS, recibos);
+  }, [recibos]);
 
   // Sync with Supabase on mount
   useEffect(() => {
@@ -81,11 +89,11 @@ export default function App() {
           getEgresosAPI(),
           getUsuariosAPI()
         ]);
-        if (cloudSocios && cloudSocios.length > 0) setSocios(cloudSocios);
-        if (cloudCajas && cloudCajas.length > 0) setCajas(cloudCajas);
-        if (cloudDeudas && cloudDeudas.length > 0) setDeudas(cloudDeudas);
-        if (cloudEgresos && cloudEgresos.length > 0) setEgresos(cloudEgresos);
-        if (cloudUsuarios && cloudUsuarios.length > 0) setUsuarios(cloudUsuarios);
+        if (Array.isArray(cloudSocios)) setSocios(cloudSocios);
+        if (Array.isArray(cloudCajas) && cloudCajas.length > 0) setCajas(cloudCajas);
+        if (Array.isArray(cloudDeudas)) setDeudas(cloudDeudas);
+        if (Array.isArray(cloudEgresos)) setEgresos(cloudEgresos);
+        if (Array.isArray(cloudUsuarios) && cloudUsuarios.length > 0) setUsuarios(cloudUsuarios);
       } catch (err) {
         console.warn('Sync fallback local:', err);
       }
@@ -172,17 +180,26 @@ export default function App() {
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
-  const handleConfirmResetSystem = ({ saldoCajaGeneral = 0, saldoCajaGPS = 0 }) => {
-    // 1. Limpieza de datos a cero
+  const handleConfirmResetSystem = async ({ saldoCajaGeneral = 0, saldoCajaGPS = 0 }) => {
+    // 1. Limpieza de datos en memoria local
     setSocios([]);
     setDeudas([]);
     setEgresos([]);
     setPrestamos([]);
+    setRecibos([]);
 
-    const nuevasCajas = [
-      { id: "c1", nombre: "CAJA GENERAL", saldoAnterior: saldoCajaGeneral, ingresos: 0.00, egresos: 0.00, saldoActual: saldoCajaGeneral },
-      { id: "c2", nombre: "CAJA MANTENIMIENTO GPS", saldoAnterior: saldoCajaGPS, ingresos: 0.00, egresos: 0.00, saldoActual: saldoCajaGPS }
-    ];
+    const nuevasCajas = (cajas && cajas.length > 0 ? cajas : INITIAL_CAJAS).map(c => {
+      let saldo = 0;
+      if (c.id === 'c1') saldo = saldoCajaGeneral;
+      if (c.id === 'c2') saldo = saldoCajaGPS;
+      return {
+        ...c,
+        saldoAnterior: saldo,
+        ingresos: 0.00,
+        egresos: 0.00,
+        saldoActual: saldo
+      };
+    });
     setCajas(nuevasCajas);
 
     // 2. Guardar en almacenamiento local
@@ -193,15 +210,14 @@ export default function App() {
     saveToStorage(STORAGE_KEYS.RECIBOS, []);
     saveToStorage(STORAGE_KEYS.CAJAS, nuevasCajas);
 
-    // 3. Notificar a endpoint backend si está en línea
-    fetch('/api/sistema/reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ saldoCajaGeneral, saldoCajaGPS })
-    }).catch(() => {});
+    // 3. Ejecutar reinicio real en Supabase (PostgreSQL) a través de Railway
+    try {
+      await resetSistemaAPI({ saldoCajaGeneral, saldoCajaGPS });
+    } catch (apiErr) {
+      console.warn('[SISCOB] Aviso al resetear en nube:', apiErr.message);
+    }
 
     setActiveTab('socios');
-    alert('¡Puesta a Cero completada con éxito! Se ha limpiado el sistema (socios, deudas, préstamos y egresos) y las cajas están listas para registrar este mes.');
   };
 
   const handleGoToCobranza = (socioId) => {
@@ -324,6 +340,8 @@ export default function App() {
               setCajas={setCajas}
               preselectedSocioId={preselectedSocioId}
               printMode={printMode}
+              recibos={recibos}
+              setRecibos={setRecibos}
             />
           )}
           {activeTab === 'egresos' && (

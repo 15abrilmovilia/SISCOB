@@ -41,7 +41,17 @@ const INITIAL_HISTORIAL_RECIBOS = [
   }
 ];
 
-export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCajas, preselectedSocioId, printMode }) {
+export default function CobranzasPage({ 
+  socios, 
+  deudas, 
+  setDeudas, 
+  cajas, 
+  setCajas, 
+  preselectedSocioId, 
+  printMode,
+  recibos,
+  setRecibos
+}) {
   // Navigation: 'cobro' (Ventanilla) | 'historial' (Recibos emitidos)
   const [activeSubTab, setActiveSubTab] = useState('cobro');
 
@@ -51,21 +61,13 @@ export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCaj
   const [currentReceipt, setCurrentReceipt] = useState(null);
   const [radioMode, setRadioMode] = useState('deudas');
 
-  // Historial de Recibos emitidos con persistencia
-  const [historialRecibos, setHistorialRecibos] = useState(() => 
-    loadFromStorage('siscob_recibos', INITIAL_HISTORIAL_RECIBOS)
+  // Historial de Recibos emitidos (enlazado con estado central de App y Supabase)
+  const [localRecibos, setLocalRecibos] = useState(() => 
+    loadFromStorage('siscob_recibos', [])
   );
 
-  useEffect(() => {
-    if (socios.length === 0 && historialRecibos.some(r => r.socioId === 20 || [1084, 1083, 1082].includes(r.nroRecibo))) {
-      setHistorialRecibos([]);
-      saveToStorage('siscob_recibos', []);
-    }
-  }, [socios, historialRecibos]);
-
-  useEffect(() => {
-    saveToStorage('siscob_recibos', historialRecibos);
-  }, [historialRecibos]);
+  const historialRecibos = recibos !== undefined ? recibos : localRecibos;
+  const setHistorialRecibos = setRecibos || setLocalRecibos;
 
   // Mensaje de notificación temporal
   const [alertMsg, setAlertMsg] = useState(null);
