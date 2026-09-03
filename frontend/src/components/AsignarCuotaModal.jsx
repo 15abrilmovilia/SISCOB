@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, X, DollarSign, Calendar, ShieldAlert, CheckCircle2, User } from 'lucide-react';
+import { X, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { createDeudaAPI } from '../utils/api';
 
 const CONCEPTOS_RAPIDOS = [

@@ -3,14 +3,8 @@ import {
   Sliders, 
   Plus, 
   Users, 
-  ArrowRightLeft, 
-  CheckSquare, 
-  Square, 
   AlertCircle, 
-  Sparkles,
-  ShieldAlert,
-  CheckCircle2,
-  DollarSign
+  ShieldAlert
 } from 'lucide-react';
 import { createDeudaAPI } from '../utils/api';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
