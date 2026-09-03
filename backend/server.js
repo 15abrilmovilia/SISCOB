@@ -21,13 +21,26 @@ if (process.env.DATABASE_URL) {
   console.log('[SISCOB Backend] Modo desarrollo local activo (sin base de datos remota conectada aún).');
 }
 
-// 1. Health Check
-app.get('/api/health', (req, res) => {
+// 1. Health Check (Verifica conexión real a PostgreSQL)
+app.get('/api/health', async (req, res) => {
+  let dbOk = false;
+  let dbError = null;
+  if (pool) {
+    try {
+      await pool.query('SELECT 1');
+      dbOk = true;
+    } catch (err) {
+      dbError = err.message;
+    }
+  }
+
   res.json({
     status: 'online',
     sistema: 'SISCOB - Radio Móvil 15 de Abril',
     version: '1.0.0',
-    db_connected: !!pool,
+    db_configured: !!pool,
+    db_connected: dbOk,
+    db_error: dbError,
     timestamp: new Date().toISOString()
   });
 });
@@ -40,7 +53,11 @@ app.get('/api/socios', async (req, res) => {
       return res.json(rows);
     } catch (err) {
       console.error('DB Error:', err);
-      return res.status(500).json({ error: 'Error al consultar socios en base de datos.' });
+      return res.status(500).json({ 
+        error: 'Error al consultar socios en base de datos.',
+        message: err.message,
+        code: err.code
+      });
     }
   }
   // Mock response fallback
