@@ -13,11 +13,17 @@ export default function ReiniciarSistemaModal({
   isOpen, 
   onClose, 
   onConfirmReset, 
-  onExportBackup 
+  onExportBackup,
+  cajas = []
 }) {
   const [backupDownloaded, setBackupDownloaded] = useState(false);
-  const [saldoCajaGeneral, setSaldoCajaGeneral] = useState('0.00');
-  const [saldoCajaGPS, setSaldoCajaGPS] = useState('0.00');
+  const [saldosCajas, setSaldosCajas] = useState({
+    c1: '0.00',
+    c2: '0.00',
+    c3: '0.00',
+    c4: '0.00',
+    c5: '0.00'
+  });
   const [confirmWord, setConfirmWord] = useState('');
   const [error, setError] = useState('');
   const [isResetting, setIsResetting] = useState(false);
@@ -42,22 +48,23 @@ export default function ReiniciarSistemaModal({
       return;
     }
 
-    const cGeneral = parseFloat(saldoCajaGeneral) || 0;
-    const cGPS = parseFloat(saldoCajaGPS) || 0;
+    const payloadSaldos = {
+      c1: parseFloat(saldosCajas.c1) || 0,
+      c2: parseFloat(saldosCajas.c2) || 0,
+      c3: parseFloat(saldosCajas.c3) || 0,
+      c4: parseFloat(saldosCajas.c4) || 0,
+      c5: parseFloat(saldosCajas.c5) || 0
+    };
 
     setIsResetting(true);
     setError('');
     try {
-      await onConfirmReset({
-        saldoCajaGeneral: cGeneral,
-        saldoCajaGPS: cGPS
-      });
+      await onConfirmReset(payloadSaldos);
       setIsResetting(false);
       onClose();
-      alert('¡Puesta a Cero completada con éxito! La base de datos en Supabase y el sistema local han quedado completamente en blanco para el nuevo mes.');
     } catch (err) {
       setIsResetting(false);
-      setError(`Error al reiniciar en Supabase: ${err.message || 'Verifique la conexión a internet'}`);
+      setError(`Error al reiniciar: ${err.message || 'Ocurrió un problema'}`);
     }
   };
 
@@ -137,34 +144,76 @@ export default function ReiniciarSistemaModal({
           {/* Paso 2: Saldos de Apertura de Cajas para este mes */}
           <div className="space-y-3">
             <span className="font-black text-slate-800 block">
-              Paso 2: Saldos de Apertura en Efectivo (Mes Actual)
+              Paso 2: Saldos de Apertura en Efectivo (Mes Actual - 5 Cajas Oficiales)
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Saldo Inicial Caja General (Bs):
+                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                  1. Caja de Frecuencia (Bs):
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={saldoCajaGeneral}
-                  onChange={(e) => setSaldoCajaGeneral(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  value={saldosCajas.c1}
+                  onChange={(e) => setSaldosCajas({ ...saldosCajas, c1: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Saldo Inicial Caja GPS (Bs):
+                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                  2. Caja Multas e Infracciones (Bs):
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={saldoCajaGPS}
-                  onChange={(e) => setSaldoCajaGPS(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  value={saldosCajas.c2}
+                  onChange={(e) => setSaldosCajas({ ...saldosCajas, c2: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                  3. Caja Nuevos Socios (Bs):
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={saldosCajas.c3}
+                  onChange={(e) => setSaldosCajas({ ...saldosCajas, c3: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                  4. Caja Préstamos (Bs):
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={saldosCajas.c4}
+                  onChange={(e) => setSaldosCajas({ ...saldosCajas, c4: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
+                  5. Caja Frecuencia Inquilinos (Bs):
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={saldosCajas.c5}
+                  onChange={(e) => setSaldosCajas({ ...saldosCajas, c5: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
             </div>

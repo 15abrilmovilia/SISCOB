@@ -202,10 +202,29 @@ app.delete('/api/socios/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// 5 Cajas Oficiales de SISCOB
+const OFFICIAL_5_CAJAS = [
+  { id: "c1", nombre: "CAJA DE FRECUENCIA", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
+  { id: "c2", nombre: "CAJA DE MULTAS E INFRACCIONES", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
+  { id: "c3", nombre: "CAJA NUEVOS SOCIOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
+  { id: "c4", nombre: "CAJA PRÉSTAMOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
+  { id: "c5", nombre: "CAJA FRECUENCIA INQUILINOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 }
+];
+
 // 3. Cajas Endpoints
 app.get('/api/cajas', async (req, res) => {
   if (pool) {
     try {
+      // Asegurar que las 5 cajas existan en la tabla de Supabase
+      for (const c of OFFICIAL_5_CAJAS) {
+        await pool.query(`
+          INSERT INTO cajas (id, nombre, saldo_anterior, ingresos, egresos, saldo_actual)
+          VALUES ($1, $2, $3, 0, 0, $3)
+          ON CONFLICT (id) DO UPDATE 
+          SET nombre = $2
+        `, [c.id, c.nombre, c.saldoAnterior]).catch(() => {});
+      }
+
       const { rows } = await pool.query('SELECT * FROM cajas ORDER BY id ASC');
       const formatted = rows.map(c => ({
         id: c.id,
@@ -217,10 +236,11 @@ app.get('/api/cajas', async (req, res) => {
       }));
       return res.json(formatted);
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      console.warn('DB Warning cajas, devolviendo 5 cajas base:', err.message);
+      return res.json(OFFICIAL_5_CAJAS);
     }
   }
-  res.json([]);
+  res.json(OFFICIAL_5_CAJAS);
 });
 
 // 4. Deudas / Cuentas por cobrar Endpoints
@@ -476,7 +496,7 @@ app.delete('/api/usuarios/:id', (req, res) => {
 
 // 8. Puesta a Cero de Producción
 app.post('/api/sistema/reset', async (req, res) => {
-  const { saldoCajaGeneral = 0, saldoCajaGPS = 0 } = req.body || {};
+  const payloadSaldos = req.body || {};
   if (pool) {
     try {
       await pool.query('DELETE FROM deudas_socio');
@@ -485,10 +505,18 @@ app.post('/api/sistema/reset', async (req, res) => {
       await pool.query('DELETE FROM socios');
       await pool.query('DELETE FROM auditoria_logs').catch(() => {});
       
-      // Reiniciar cajas principales con saldos de apertura solicitados
-      await pool.query('UPDATE cajas SET saldo_anterior = $1, ingresos = 0, egresos = 0, saldo_actual = $1 WHERE id = $2', [saldoCajaGeneral, 'c1']);
-      await pool.query('UPDATE cajas SET saldo_anterior = $1, ingresos = 0, egresos = 0, saldo_actual = $1 WHERE id = $2', [saldoCajaGPS, 'c2']);
-      await pool.query('UPDATE cajas SET saldo_anterior = 0, ingresos = 0, egresos = 0, saldo_actual = 0 WHERE id NOT IN ($1, $2)', ['c1', 'c2']).catch(() => {});
+      // Reiniciar las 5 cajas oficiales con sus saldos de apertura
+      for (const c of OFFICIAL_5_CAJAS) {
+        const saldo = typeof payloadSaldos[c.id] === 'number' 
+          ? payloadSaldos[c.id] 
+          : (parseFloat(payloadSaldos[c.id]) || 0);
+        await pool.query(`
+          INSERT INTO cajas (id, nombre, saldo_anterior, ingresos, egresos, saldo_actual)
+          VALUES ($1, $2, $3, 0, 0, $3)
+          ON CONFLICT (id) DO UPDATE 
+          SET nombre = $2, saldo_anterior = $3, ingresos = 0, egresos = 0, saldo_actual = $3
+        `, [c.id, c.nombre, saldo]).catch(() => {});
+      }
 
       // Reiniciar secuencias autonuméricas para que los nuevos socios inicien en 1
       try {
@@ -500,13 +528,13 @@ app.post('/api/sistema/reset', async (req, res) => {
         console.warn('Reinicio de secuencias advertencia:', seqErr.message);
       }
 
-      return res.json({ success: true, message: 'Base de datos en Supabase reiniciada a cero con éxito.' });
+      return res.json({ success: true, message: 'Base de datos en Supabase reiniciada a cero con las 5 cajas oficiales.' });
     } catch (err) {
       console.error('Error al reiniciar DB en Supabase:', err);
       return res.status(500).json({ error: 'Error al reiniciar DB en Supabase', detail: err.message });
     }
   }
-  res.json({ success: true, message: 'Memoria reiniciada a cero.' });
+  res.json({ success: true, message: 'Memoria reiniciada a cero con las 5 cajas oficiales.' });
 });
 
 // Start Server (using native node execution, no nodemon)

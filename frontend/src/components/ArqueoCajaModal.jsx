@@ -7,9 +7,9 @@ export default function ArqueoCajaModal({ isOpen, onClose, cajas, currentUser })
   const [efectivoFisico, setEfectivoFisico] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
-  const saldoInicial = 2500.0;
-  const totalIngresos = cajas.reduce((acc, c) => acc + c.ingresos, 0);
-  const totalEgresos = cajas.reduce((acc, c) => acc + c.egresos, 0);
+  const saldoInicial = cajas.reduce((acc, c) => acc + (parseFloat(c.saldoAnterior) || 0), 0);
+  const totalIngresos = cajas.reduce((acc, c) => acc + (parseFloat(c.ingresos) || 0), 0);
+  const totalEgresos = cajas.reduce((acc, c) => acc + (parseFloat(c.egresos) || 0), 0);
   const saldoTeorico = saldoInicial + totalIngresos - totalEgresos;
 
   const fisico = parseFloat(efectivoFisico) || 0;
@@ -21,7 +21,7 @@ export default function ArqueoCajaModal({ isOpen, onClose, cajas, currentUser })
         <div className="bg-slate-900 text-white px-5 py-3.5 flex justify-between items-center no-print">
           <div className="flex items-center space-x-2">
             <Landmark className="w-4 h-4 text-red-400" />
-            <span className="font-bold text-sm">Cierre de Turno y Arqueo Diario de Caja</span>
+            <span className="font-bold text-sm">Cierre de Turno y Arqueo Consolidado (5 Cajas)</span>
           </div>
           <div className="flex space-x-2">
             <button
@@ -44,19 +44,35 @@ export default function ArqueoCajaModal({ isOpen, onClose, cajas, currentUser })
               RADIO MÓVIL 15 DE ABRIL
             </h2>
             <p className="text-[11px] font-bold text-red-700 uppercase">
-              COMPROBANTE DE CORTE Y ARQUEO DE CAJA
+              COMPROBANTE DE CORTE Y ARQUEO GENERAL
             </p>
             <p className="text-[10px] font-mono text-slate-500">
               Fecha: {new Date().toLocaleDateString('es-BO')} • Hora: {new Date().toLocaleTimeString('es-BO')}
             </p>
             <p className="text-[10px] font-mono font-bold text-slate-700">
-              Cajero Responsable: {currentUser?.nombre || 'Daniela (Cajera 01)'}
+              Responsable: {currentUser?.nombre || 'Administrador Central'}
             </p>
+          </div>
+
+          {/* Desglose de las 5 Cajas */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 font-mono text-[11px] space-y-1.5">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 pb-1 border-b border-slate-200">
+              Desglose por Caja Oficial (5 Cajas):
+            </div>
+            {cajas.map(c => {
+              const saldoCaja = c.saldoActual !== undefined ? c.saldoActual : ((c.saldoAnterior || 0) + (c.ingresos || 0) - (c.egresos || 0));
+              return (
+                <div key={c.id} className="flex justify-between items-center text-slate-700">
+                  <span className="truncate pr-2 font-bold">{c.nombre}:</span>
+                  <span className="font-black text-slate-900 shrink-0">Bs {saldoCaja.toFixed(2)}</span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200 font-mono">
             <div className="flex justify-between">
-              <span>Saldo Apertura Turno:</span>
+              <span>Saldo Apertura Total:</span>
               <strong className="text-slate-800">Bs {saldoInicial.toFixed(2)}</strong>
             </div>
             <div className="flex justify-between text-emerald-700 font-bold">
@@ -68,7 +84,7 @@ export default function ArqueoCajaModal({ isOpen, onClose, cajas, currentUser })
               <span>Bs {totalEgresos.toFixed(2)}</span>
             </div>
             <div className="border-t border-slate-300 pt-1 flex justify-between text-slate-900 font-black text-sm">
-              <span>(=) SALDO TEÓRICO EN CAJA:</span>
+              <span>(=) SALDO TOTAL TEÓRICO:</span>
               <span>Bs {saldoTeorico.toFixed(2)}</span>
             </div>
           </div>

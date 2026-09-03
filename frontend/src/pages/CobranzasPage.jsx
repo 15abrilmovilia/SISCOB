@@ -12,7 +12,8 @@ import {
   Eye,
   FileText,
   BadgeAlert,
-  ArrowLeft
+  ArrowLeft,
+  Landmark
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import { registrarCobranzaAPI, anularCobranzaAPI } from '../utils/api';
@@ -72,6 +73,9 @@ export default function CobranzasPage({
   // Mensaje de notificación temporal
   const [alertMsg, setAlertMsg] = useState(null);
 
+  // Caja seleccionada para el depósito (5 Cajas oficiales)
+  const [selectedCajaId, setSelectedCajaId] = useState('c1');
+
   // Search in Historial
   const [historialSearch, setHistorialSearch] = useState('');
 
@@ -99,6 +103,24 @@ export default function CobranzasPage({
   const totalSus = selectedItems.filter(d => d.moneda === '$us').reduce((acc, curr) => acc + curr.monto, 0);
   const totalDeudaAcumulada = socioDeudas.reduce((acc, curr) => acc + curr.monto, 0);
 
+  // Sugerir automáticamente la caja según el concepto o categoría del socio
+  useEffect(() => {
+    if (selectedItems.length > 0) {
+      const desc = (selectedItems[0].descripcion || '').toUpperCase();
+      if (desc.includes('MULTA') || desc.includes('INFRAC') || desc.includes('ASAMBLEA') || desc.includes('MARCHA') || desc.includes('SANCION')) {
+        setSelectedCajaId('c2'); // CAJA DE MULTAS E INFRACCIONES
+      } else if (desc.includes('PRESTAMO') || desc.includes('CREDITO') || desc.includes('INTERES') || desc.includes('AMORTIZ')) {
+        setSelectedCajaId('c4'); // CAJA PRÉSTAMOS
+      } else if (desc.includes('NUEVO') || desc.includes('INGRESO') || desc.includes('ACCION') || desc.includes('INSCRIPCION')) {
+        setSelectedCajaId('c3'); // CAJA NUEVOS SOCIOS
+      } else if (activeSocio?.categoria === 'Conductores' || activeSocio?.categoria === 'Inquilino' || desc.includes('INQUILINO') || desc.includes('RELEVO')) {
+        setSelectedCajaId('c5'); // CAJA FRECUENCIA INQUILINOS
+      } else {
+        setSelectedCajaId('c1'); // CAJA DE FRECUENCIA
+      }
+    }
+  }, [selectedDeudaIds, activeSocio]);
+
   // REGISTRAR COBRANZA
   const handleCobrar = async () => {
     if (selectedItems.length === 0) {
@@ -106,6 +128,7 @@ export default function CobranzasPage({
       return;
     }
 
+    const chosenCaja = cajas.find(c => c.id === selectedCajaId) || cajas[0] || { id: 'c1', nombre: 'CAJA DE FRECUENCIA' };
     const nroRecibo = Math.floor(100000 + Math.random() * 900000);
     const receiptData = {
       nroRecibo,
@@ -120,8 +143,8 @@ export default function CobranzasPage({
       totalBs,
       totalSus,
       metodoPago: 'Efectivo',
-      cajaId: 'c1',
-      cajaNombre: 'CAJA GENERAL (EFECTIVO)',
+      cajaId: chosenCaja.id,
+      cajaNombre: chosenCaja.nombre,
       observaciones,
       estado: 'VIGENTE',
       deudaIds: [...selectedDeudaIds]
@@ -140,26 +163,28 @@ export default function CobranzasPage({
     setDeudas(updatedDeudas);
 
     const updatedCajas = cajas.map(c => 
-      c.id === 'c1' ? { ...c, ingresos: c.ingresos + totalBs, saldoActual: (c.saldoActual || 0) + totalBs } : c
+      c.id === chosenCaja.id 
+        ? { ...c, ingresos: (c.ingresos || 0) + totalBs, saldoActual: (c.saldoActual || c.saldoAnterior || 0) + totalBs } 
+        : c
     );
     setCajas(updatedCajas);
 
     setSelectedDeudaIds([]);
     setObservaciones('');
 
-    // 4. Registrar en Supabase a través de Railway
+    // 4. Registrar en backend
     try {
       await registrarCobranzaAPI({
         nroRecibo: `REC-${nroRecibo}`,
         socioId: activeSocio.id,
-        cajaId: 'c1',
+        cajaId: chosenCaja.id,
         total: totalBs,
         metodoPago: 'Efectivo',
         cajero: 'Cajero Central',
         deudaIds: selectedDeudaIds
       });
     } catch (e) {
-      console.warn('Error al sincronizar cobranza con Supabase:', e);
+      console.warn('Error al sincronizar cobranza con backend:', e);
     }
   };
 
@@ -170,11 +195,12 @@ export default function CobranzasPage({
       return;
     }
 
+    const cajaNombreAfectada = cajas.find(c => c.id === (recibo.cajaId || 'c1'))?.nombre || 'la Caja';
     const confirmar = window.confirm(
       `¿Está seguro de ANULAR el Recibo N° ${recibo.nroRecibo} emitido a ${recibo.socioNombre} por Bs ${recibo.totalBs.toFixed(2)}?\n\n` +
       `Efectos automáticos:\n` +
       `1. Las deudas cobradas volverán a estar PENDIENTES en la cuenta del socio.\n` +
-      `2. Se descontarán Bs ${recibo.totalBs.toFixed(2)} de la Caja General para que el arqueo cuadre exacto.\n` +
+      `2. Se descontarán Bs ${recibo.totalBs.toFixed(2)} de ${cajaNombreAfectada} para que el arqueo cuadre exacto.\n` +
       `3. El recibo quedará marcado como ANULADO en el historial de auditoría.`
     );
 
@@ -462,7 +488,27 @@ export default function CobranzasPage({
 
           {/* Observations & Action Buttons */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap justify-between items-center gap-4">
-            <div className="flex-1 max-w-lg">
+            
+            {/* Selector de Caja Destino (5 Cajas oficiales) */}
+            <div className="w-full sm:w-auto min-w-[270px]">
+              <label className="block text-xs font-black text-slate-800 mb-1 flex items-center space-x-1.5">
+                <Landmark className="w-4 h-4 text-red-700" />
+                <span>Caja Destino del Cobro:</span>
+              </label>
+              <select
+                value={selectedCajaId}
+                onChange={(e) => setSelectedCajaId(e.target.value)}
+                className="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-black text-slate-900 focus:ring-2 focus:ring-red-500 cursor-pointer shadow-xs"
+              >
+                {cajas.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre} (Saldo: Bs {(c.saldoActual || 0).toFixed(2)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex-1 min-w-[240px] max-w-md">
               <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Observaciones del Recibo:
               </label>
@@ -471,7 +517,7 @@ export default function CobranzasPage({
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
                 placeholder="Ej. Pago correspondiente a aportes del mes..."
-                className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                className="w-full p-2 border border-slate-300 rounded-xl text-xs"
               />
             </div>
 

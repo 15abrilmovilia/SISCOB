@@ -61,7 +61,13 @@ export default function App() {
 
   const [socios, setSocios] = useState(() => loadFromStorage(STORAGE_KEYS.SOCIOS, INITIAL_SOCIOS));
   const [deudas, setDeudas] = useState(() => loadFromStorage(STORAGE_KEYS.DEUDAS, INITIAL_DEUDAS));
-  const [cajas, setCajas] = useState(() => loadFromStorage(STORAGE_KEYS.CAJAS, INITIAL_CAJAS));
+  const [cajas, setCajas] = useState(() => {
+    const loaded = loadFromStorage(STORAGE_KEYS.CAJAS, null);
+    if (!loaded || !Array.isArray(loaded) || loaded.length !== 5 || loaded[0]?.nombre === 'CAJA GENERAL') {
+      return INITIAL_CAJAS;
+    }
+    return loaded;
+  });
   const [egresos, setEgresos] = useState(() => loadFromStorage(STORAGE_KEYS.EGRESOS, INITIAL_EGRESOS));
   const [prestamos, setPrestamos] = useState(() => loadFromStorage(STORAGE_KEYS.PRESTAMOS, INITIAL_PRESTAMOS));
   const [recibos, setRecibos] = useState(() => loadFromStorage(STORAGE_KEYS.RECIBOS, INITIAL_RECIBOS));
@@ -180,7 +186,7 @@ export default function App() {
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
-  const handleConfirmResetSystem = async ({ saldoCajaGeneral = 0, saldoCajaGPS = 0 }) => {
+  const handleConfirmResetSystem = async (payloadSaldos = {}) => {
     // 1. Limpieza de datos en memoria local
     setSocios([]);
     setDeudas([]);
@@ -188,10 +194,10 @@ export default function App() {
     setPrestamos([]);
     setRecibos([]);
 
-    const nuevasCajas = (cajas && cajas.length > 0 ? cajas : INITIAL_CAJAS).map(c => {
-      let saldo = 0;
-      if (c.id === 'c1') saldo = saldoCajaGeneral;
-      if (c.id === 'c2') saldo = saldoCajaGPS;
+    const nuevasCajas = INITIAL_CAJAS.map(c => {
+      const saldo = typeof payloadSaldos[c.id] === 'number' 
+        ? payloadSaldos[c.id] 
+        : (parseFloat(payloadSaldos[c.id]) || 0.0);
       return {
         ...c,
         saldoAnterior: saldo,
@@ -210,14 +216,15 @@ export default function App() {
     saveToStorage(STORAGE_KEYS.RECIBOS, []);
     saveToStorage(STORAGE_KEYS.CAJAS, nuevasCajas);
 
-    // 3. Ejecutar reinicio real en Supabase (PostgreSQL) a través de Railway
+    // 3. Ejecutar reinicio real en backend/Supabase
     try {
-      await resetSistemaAPI({ saldoCajaGeneral, saldoCajaGPS });
+      await resetSistemaAPI(payloadSaldos);
     } catch (apiErr) {
       console.warn('[SISCOB] Aviso al resetear en nube:', apiErr.message);
     }
 
     setActiveTab('socios');
+    alert('¡Puesta a Cero completada con éxito! Las 5 cajas oficiales están configuradas y listas para las operaciones de este mes.');
   };
 
   const handleGoToCobranza = (socioId) => {
@@ -447,6 +454,7 @@ export default function App() {
         onClose={() => setIsResetModalOpen(false)}
         onConfirmReset={handleConfirmResetSystem}
         onExportBackup={handleExportBackup}
+        cajas={cajas}
       />
     </div>
   );

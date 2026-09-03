@@ -12,23 +12,52 @@ export const INITIAL_SOCIOS = [];
 // Cuentas por Cobrar y Obligaciones en Cero
 export const INITIAL_DEUDAS = [];
 
-// Balance de Cajas de Apertura - Mes Actual (Septiembre 2026)
+// 5 Cajas Oficiales de Recaudación y Operación - Radio Móvil 15 de Abril
 export const INITIAL_CAJAS = [
   { 
     id: "c1", 
-    nombre: "CAJA GENERAL", 
+    nombre: "CAJA DE FRECUENCIA", 
     saldoAnterior: 0.00, 
     ingresos: 0.00, 
     egresos: 0.00, 
-    saldoActual: 0.00 
+    saldoActual: 0.00,
+    descripcion: "Cuotas ordinarias de frecuencia y sostenimiento de socios"
   },
   { 
     id: "c2", 
-    nombre: "CAJA MANTENIMIENTO GPS", 
+    nombre: "CAJA DE MULTAS E INFRACCIONES", 
     saldoAnterior: 0.00, 
     ingresos: 0.00, 
     egresos: 0.00, 
-    saldoActual: 0.00 
+    saldoActual: 0.00,
+    descripcion: "Sanciones por inasistencias a asambleas, reuniones y marchas"
+  },
+  { 
+    id: "c3", 
+    nombre: "CAJA NUEVOS SOCIOS", 
+    saldoAnterior: 0.00, 
+    ingresos: 0.00, 
+    egresos: 0.00, 
+    saldoActual: 0.00,
+    descripcion: "Inscripciones, cuotas de ingreso y aportes de nuevos afiliados"
+  },
+  { 
+    id: "c4", 
+    nombre: "CAJA PRÉSTAMOS", 
+    saldoAnterior: 0.00, 
+    ingresos: 0.00, 
+    egresos: 0.00, 
+    saldoActual: 0.00,
+    descripcion: "Fondo rotatorio de créditos internos y cobro de amortizaciones"
+  },
+  { 
+    id: "c5", 
+    nombre: "CAJA FRECUENCIA INQUILINOS", 
+    saldoAnterior: 0.00, 
+    ingresos: 0.00, 
+    egresos: 0.00, 
+    saldoActual: 0.00,
+    descripcion: "Aportes y uso de frecuencia para conductores inquilinos y relevos"
   }
 ];
 
