@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Menu, Calendar, Printer, Settings, Download, Upload, LogOut, UserCheck } from 'lucide-react';
+import { Menu, Calendar, Printer, Settings, Download, Upload, LogOut, UserCheck, RotateCcw } from 'lucide-react';
 
 export default function Header({ 
   toggleSidebar, 
@@ -10,7 +10,8 @@ export default function Header({
   onLogout,
   onExportBackup,
   onImportBackup,
-  onOpenArqueoModal
+  onOpenArqueoModal,
+  onOpenResetModal
 }) {
   const fileInputRef = useRef(null);
 
@@ -82,6 +83,18 @@ export default function Header({
             <Upload className="w-3.5 h-3.5 text-emerald-600" />
             <span>Restaurar</span>
           </button>
+
+          {/* Reset / Puesta a Cero button */}
+          {onOpenResetModal && (
+            <button
+              onClick={onOpenResetModal}
+              className="hidden lg:flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
+              title="Puesta a Cero e Inicio Limpio de Mes"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Puesta a Cero</span>
+            </button>
+          )}
 
           {/* Printer format switcher */}
           <div className="flex items-center space-x-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">

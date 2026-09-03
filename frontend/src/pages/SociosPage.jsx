@@ -518,8 +518,23 @@ export default function SociosPage({
                 <tr>
                   <td colSpan="8" className="py-12 text-center text-slate-400 space-y-2">
                     <Users className="w-10 h-10 mx-auto text-slate-300" />
-                    <p className="font-bold text-sm text-slate-600">No se encontraron afiliados</p>
-                    <p className="text-xs text-slate-400">Prueba ajustando los filtros de búsqueda o categoría.</p>
+                    <p className="font-bold text-sm text-slate-700">
+                      {socios.length === 0 ? 'Padrón en Blanco para Este Mes' : 'No se encontraron afiliados'}
+                    </p>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                      {socios.length === 0 
+                        ? 'El sistema está limpio a cero. Puede comenzar a registrar los socios activos de Radio Móvil 15 de Abril.'
+                        : 'Prueba ajustando los filtros de búsqueda o categoría.'}
+                    </p>
+                    {socios.length === 0 && onOpenNewSocioModal && (
+                      <button
+                        onClick={onOpenNewSocioModal}
+                        className="mt-2 inline-flex items-center space-x-2 bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-xl text-xs font-black shadow-md transition cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>REGISTRAR PRIMER SOCIO</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (

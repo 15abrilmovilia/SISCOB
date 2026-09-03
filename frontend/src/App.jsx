@@ -19,6 +19,7 @@ import FichaTecnicaPage from './pages/FichaTecnicaPage';
 import ConfigPage from './pages/ConfigPage';
 import UsuariosRolesPage from './pages/UsuariosRolesPage';
 import NewSocioModal from './components/NewSocioModal';
+import ReiniciarSistemaModal from './components/ReiniciarSistemaModal';
 
 import { 
   INITIAL_SOCIOS, 
@@ -152,6 +153,37 @@ export default function App() {
     );
   };
 
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+
+  const handleConfirmResetSystem = ({ saldoCajaGeneral = 0, saldoCajaGPS = 0 }) => {
+    // 1. Limpieza de datos a cero
+    setSocios([]);
+    setDeudas([]);
+    setEgresos([]);
+
+    const nuevasCajas = [
+      { id: "c1", nombre: "CAJA GENERAL", saldoAnterior: saldoCajaGeneral, ingresos: 0.00, egresos: 0.00, saldoActual: saldoCajaGeneral },
+      { id: "c2", nombre: "CAJA MANTENIMIENTO GPS", saldoAnterior: saldoCajaGPS, ingresos: 0.00, egresos: 0.00, saldoActual: saldoCajaGPS }
+    ];
+    setCajas(nuevasCajas);
+
+    // 2. Guardar en almacenamiento local
+    saveToStorage(STORAGE_KEYS.SOCIOS, []);
+    saveToStorage(STORAGE_KEYS.DEUDAS, []);
+    saveToStorage(STORAGE_KEYS.EGRESOS, []);
+    saveToStorage(STORAGE_KEYS.CAJAS, nuevasCajas);
+
+    // 3. Notificar a endpoint backend si está en línea
+    fetch('/api/sistema/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ saldoCajaGeneral, saldoCajaGPS })
+    }).catch(() => {});
+
+    setActiveTab('socios');
+    alert('¡Puesta a Cero completada con éxito! Se ha limpiado el sistema y las cajas están listas para registrar este mes.');
+  };
+
   const handleGoToCobranza = (socioId) => {
     setPreselectedSocioId(socioId);
     setActiveTab('cobranzas');
@@ -229,6 +261,7 @@ export default function App() {
           onExportBackup={handleExportBackup}
           onImportBackup={handleImportBackup}
           onOpenArqueoModal={() => setIsArqueoModalOpen(true)}
+          onOpenResetModal={() => setIsResetModalOpen(true)}
         />
 
         <main className="flex-1 py-4">
@@ -366,6 +399,13 @@ export default function App() {
         onClose={() => setIsArqueoModalOpen(false)}
         cajas={cajas}
         currentUser={currentUser}
+      />
+
+      <ReiniciarSistemaModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        onConfirmReset={handleConfirmResetSystem}
+        onExportBackup={handleExportBackup}
       />
     </div>
   );

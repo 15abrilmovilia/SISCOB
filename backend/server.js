@@ -474,6 +474,26 @@ app.delete('/api/usuarios/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// 8. Puesta a Cero de Producción
+app.post('/api/sistema/reset', async (req, res) => {
+  const { saldoCajaGeneral = 0, saldoCajaGPS = 0 } = req.body || {};
+  if (pool) {
+    try {
+      await pool.query('DELETE FROM deudas_socio');
+      await pool.query('DELETE FROM recibos');
+      await pool.query('DELETE FROM egresos');
+      await pool.query('DELETE FROM socios');
+      await pool.query('UPDATE cajas SET saldo_anterior = $1, ingresos = 0, egresos = 0, saldo_actual = $1 WHERE id = $2', [saldoCajaGeneral, 'c1']);
+      await pool.query('UPDATE cajas SET saldo_anterior = $1, ingresos = 0, egresos = 0, saldo_actual = $1 WHERE id = $2', [saldoCajaGPS, 'c2']);
+      return res.json({ success: true, message: 'Base de datos reiniciada a cero.' });
+    } catch (err) {
+      console.error('Error al reiniciar DB:', err);
+      return res.status(500).json({ error: 'Error al reiniciar DB', detail: err.message });
+    }
+  }
+  res.json({ success: true, message: 'Memoria reiniciada a cero.' });
+});
+
 // Start Server (using native node execution, no nodemon)
 app.listen(PORT, () => {
   console.log(`[SISCOB API] Servidor activo escuchando en el puerto ${PORT}`);
