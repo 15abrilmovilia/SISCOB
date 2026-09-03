@@ -560,8 +560,8 @@ export default function PrestamosPage({
 
       {/* Printable Plan de Pagos Modal */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn print:static print:inset-auto print:bg-white print:p-0 print:overflow-visible">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 print:shadow-none print:border-none print:max-w-none print:w-full print:overflow-visible">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex justify-between items-center no-print">
               <div className="flex items-center space-x-2">
                 <FileText className="w-4 h-4 text-red-400" />
@@ -581,7 +581,7 @@ export default function PrestamosPage({
               </div>
             </div>
 
-            <div id="printable-area" className="p-6 text-xs space-y-4 max-h-[75vh] overflow-y-auto">
+            <div id="printable-area" className="p-6 text-xs space-y-4 max-h-[75vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0 print:m-0">
               <div className="text-center border-b pb-3 space-y-1">
                 <h2 className="font-black text-lg uppercase tracking-wider text-slate-900">
                   RADIO MÓVIL 15 DE ABRIL S.R.L.
@@ -641,7 +641,7 @@ export default function PrestamosPage({
                 </tbody>
               </table>
 
-              <div className="grid grid-cols-2 gap-8 pt-8 text-center text-slate-600 no-screen">
+              <div className="grid grid-cols-2 gap-8 pt-8 text-center text-slate-600 firmas-container no-page-break">
                 <div className="border-t border-slate-400 pt-2 font-bold">
                   Firma del Socio Prestatario
                   <br /><span className="text-[10px] font-normal">Conformidad de Recepción</span>

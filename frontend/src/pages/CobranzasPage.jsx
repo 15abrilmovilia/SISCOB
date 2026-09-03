@@ -44,43 +44,51 @@ export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCaj
     const receiptData = {
       nroRecibo,
       fecha: new Date().toLocaleString('es-BO'),
-      usuario: 'admin33',
+      usuario: 'Cajero Central',
+      cajero: 'Cajero Central',
       socioId: activeSocio.id,
-      socioNombre: `${activeSocio.nombres} ${activeSocio.apPaterno} ${activeSocio.apMaterno || ''}`,
+      socioNombre: `${activeSocio.nombres} ${activeSocio.apPaterno} ${activeSocio.apMaterno || ''}`.trim(),
       socioCI: activeSocio.ci,
+      socioCelular: activeSocio.celular || '',
       items: selectedItems,
       totalBs,
       totalSus,
+      metodoPago: 'Efectivo',
+      cajaNombre: 'CAJA GENERAL (EFECTIVO)',
       observaciones
     };
 
-    // Registrar en Supabase a través de Railway
-    await registrarCobranzaAPI({
-      nroRecibo: `REC-${nroRecibo}`,
-      socioId: activeSocio.id,
-      cajaId: 'c1',
-      total: totalBs,
-      metodoPago: 'Efectivo',
-      cajero: 'Cajero Central',
-      deudaIds: selectedDeudaIds
-    });
+    // 1. Mostrar recibo en pantalla DE INMEDIATO
+    setCurrentReceipt(receiptData);
 
-    // Mark deudas as paid
+    // 2. Marcar deudas pagadas y actualizar saldos en el sistema
     const updatedDeudas = deudas.map(d => 
       selectedDeudaIds.includes(d.id) ? { ...d, pagado: true, nroRecibo } : d
     );
     setDeudas(updatedDeudas);
 
-    // Add to Caja General
     const updatedCajas = cajas.map(c => 
       c.id === 'c1' ? { ...c, ingresos: c.ingresos + totalBs, saldoActual: (c.saldoActual || 0) + totalBs } : c
     );
     setCajas(updatedCajas);
 
-    // Open receipt modal
-    setCurrentReceipt(receiptData);
     setSelectedDeudaIds([]);
     setObservaciones('');
+
+    // 3. Registrar en Supabase a través de Railway
+    try {
+      await registrarCobranzaAPI({
+        nroRecibo: `REC-${nroRecibo}`,
+        socioId: activeSocio.id,
+        cajaId: 'c1',
+        total: totalBs,
+        metodoPago: 'Efectivo',
+        cajero: 'Cajero Central',
+        deudaIds: selectedDeudaIds
+      });
+    } catch (e) {
+      console.warn('Error al sincronizar cobranza con Supabase:', e);
+    }
   };
 
   return (
@@ -321,7 +329,9 @@ export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCaj
 
       {/* Receipt Modal */}
       <ReceiptModal
+        isOpen={Boolean(currentReceipt)}
         receipt={currentReceipt}
+        data={currentReceipt}
         onClose={() => setCurrentReceipt(null)}
         printMode={printMode}
       />

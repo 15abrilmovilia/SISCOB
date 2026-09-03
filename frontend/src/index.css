@@ -10,40 +10,92 @@
   }
 }
 
-/* Print Optimization for Thermal Receipts & Letter Sheets */
+/* ========================================================================= */
+/* MOTOR DE IMPRESIÓN OFICIAL (MULTIPÁGINA, HOJA CARTA Y TICKET TÉRMICO)   */
+/* ========================================================================= */
 @media print {
   @page {
-    margin: 5mm;
+    margin: 10mm;
     size: auto;
   }
-  
-  body {
-    background: white !important;
-    color: black !important;
-  }
 
-  body * {
-    visibility: hidden;
-  }
-
-  #printable-area, #printable-area * {
-    visibility: visible;
-  }
-
-  #printable-area {
-    position: absolute;
-    left: 0;
-    top: 0;
+  html, body {
     width: 100% !important;
-    margin: 0 !important;
-    padding: 10px !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
     background: white !important;
     color: black !important;
-    box-shadow: none !important;
-    border: none !important;
   }
 
-  .no-print {
+  /* Ocultar elementos de navegación y barras que no van en el papel */
+  aside,
+  header,
+  footer,
+  .no-print,
+  .no-print * {
     display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Desactivar fijado y scroll de modales durante la impresión */
+  .fixed,
+  .overflow-hidden,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  [class*="max-h-"] {
+    position: static !important;
+    inset: auto !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Área imprimible en flujo natural (permite múltiples hojas completas sin cortes) */
+  #printable-area {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+    border: none !important;
+    box-shadow: none !important;
+    page-break-after: auto !important;
+  }
+
+  /* Tablas financieras multipágina */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important; /* Repite el encabezado de la tabla en cada hoja */
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  /* Evitar que el bloque de firmas se corte */
+  .firmas-container,
+  .no-page-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
