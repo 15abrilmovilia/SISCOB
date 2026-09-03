@@ -262,7 +262,12 @@ export default function App() {
             <AlmacenPage />
           )}
           {activeTab === 'reportes' && (
-            <ReportesPage socios={socios} deudas={deudas} />
+            <ReportesPage 
+              socios={socios} 
+              deudas={deudas} 
+              cajas={cajas} 
+              egresos={egresos} 
+            />
           )}
           {activeTab === 'conciliacion' && (
             <ConciliacionPage 

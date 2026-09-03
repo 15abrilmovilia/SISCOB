@@ -7,10 +7,13 @@ import {
   Download, 
   FileText,
   AlertTriangle,
-  TrendingUp
+  TrendingUp,
+  Layers,
+  Database
 } from 'lucide-react';
+import { printIsolatedDocument, downloadCSV } from '../utils/printHelper';
 
-// Datos de Ingresos Recaudados (Fiel a JasperViewer de usuario)
+// Datos de Ingresos Recaudados Históricos (Fiel a JasperViewer)
 const RAW_INGRESOS = [
   { interno: 1, nombre: 'SANTIAGO LLANOS', cat: 'Conductores', caja: 'c1', moneda: 'Bs', cajero: 'DANIELA', ahorro: 6.0, jefeLinea: 18.0, gpsJulio: 24.0, gpsMarzo: 24.0, minPunta: 10.0, proMarzo: 90.0, sostenimiento: 96.0, pandemia: 10.0, retrasado: 72.0, colaboracion: 0.0, prestamo: 0.0, interes: 0.0, proSede: 0.0, proGps2: 0.0 },
   { interno: 3, nombre: 'CARLOS MAXI', cat: 'Conductores', caja: 'c1', moneda: 'Bs', cajero: 'DANIELA', ahorro: 17.0, jefeLinea: 51.0, gpsJulio: 68.0, gpsMarzo: 0.0, minPunta: 25.0, proMarzo: 0.0, sostenimiento: 272.0, pandemia: 40.0, retrasado: 0.0, colaboracion: 30.0, prestamo: 482.0, interes: 0.0, proSede: 0.0, proGps2: 0.0 },
@@ -31,7 +34,7 @@ const RAW_INGRESOS = [
   { interno: 25, nombre: 'PAULINO MUNOZ', cat: 'Conductores', caja: 'c2', moneda: 'Bs', cajero: 'ADMIN', ahorro: 9.0, jefeLinea: 27.0, gpsJulio: 36.0, gpsMarzo: 0.0, minPunta: 5.0, proMarzo: 127.0, sostenimiento: 144.0, pandemia: 40.0, retrasado: 31.0, colaboracion: 0.0, prestamo: 0.0, interes: 0.0, proSede: 36.0, proGps2: 0.0 }
 ];
 
-// Datos de Deudas Pendientes (Fiel a Frame 164s de Quipus / JasperViewer)
+// Datos de Deudas Pendientes Históricos
 const RAW_DEUDAS_PENDIENTES = [
   { interno: 1, nombre: 'SANTIAGO LLANOS', cat: 'Conductores', caja: 'c1', moneda: 'Bs', retrasado: 248.0, inasistencia: 0.0, gpsJulio: 56.0, pandemia: 650.0, interes: 0.0, prestamo: 0.0, colaboracion: 0.0, promanten: 0.0, guardaBarro: 0.0, llanta: 0.0, gpsMarzo: 0.0 },
   { interno: 2, nombre: 'CARLOS MAXI', cat: 'Conductores', caja: 'c1', moneda: 'Bs', retrasado: 320.0, inasistencia: 0.0, gpsJulio: 80.0, pandemia: 660.0, interes: 125.0, prestamo: 2060.0, colaboracion: 30.0, promanten: 0.0, guardaBarro: 0.0, llanta: 0.0, gpsMarzo: 0.0 },
@@ -54,11 +57,11 @@ const RAW_DEUDAS_PENDIENTES = [
   { interno: 20, nombre: 'REMBERTO TORRICO', cat: 'Conductores', caja: 'c1', moneda: 'Bs', retrasado: 144.0, inasistencia: 0.0, gpsJulio: 36.0, pandemia: 610.0, interes: 0.0, prestamo: 0.0, colaboracion: 0.0, promanten: 0.0, guardaBarro: 0.0, llanta: 0.0, gpsMarzo: 0.0 }
 ];
 
-export default function ReportesPage() {
+export default function ReportesPage({ socios = [], deudas = [], cajas = [], egresos = [] }) {
   const [reportTab, setReportTab] = useState('recaudados'); // 'recaudados' | 'deudas'
+  const [dataSource, setDataSource] = useState('historico'); // 'historico' | 'real'
 
-  // Shared Filter States:
-  // Desde, Hasta, Categoria, Moneda, Cajas, Cajero
+  // Shared Filter States
   const [fechaDesde, setFechaDesde] = useState('2026-07-20');
   const [fechaHasta, setFechaHasta] = useState('2026-08-01');
   const [selectedCategoria, setSelectedCategoria] = useState('TODOS');
@@ -102,7 +105,7 @@ export default function ReportesPage() {
   }, [filteredIngresos]);
   const grandTotalIngresos = Object.values(totalsIngresos).reduce((a, b) => a + b, 0);
 
-  // 2. Filtrado para Deudas Pendientes (Misma lógica exacta)
+  // 2. Filtrado para Deudas Pendientes
   const filteredDeudas = useMemo(() => {
     return RAW_DEUDAS_PENDIENTES.filter(item => {
       const matchCat = selectedCategoria === 'TODOS' || item.cat === selectedCategoria;
@@ -133,23 +136,242 @@ export default function ReportesPage() {
   }, [filteredDeudas]);
   const grandTotalDeudas = Object.values(totalsDeudas).reduce((a, b) => a + b, 0);
 
+  // 3. EXPORTAR A EXCEL / CSV REAL (Descarga directa)
   const handleExportExcel = (tipo) => {
-    alert(`Reporte "${tipo}" exportado a Excel.
-Periodo: ${fechaDesde} al ${fechaHasta}
-Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixed(2)}`);
+    if (tipo === 'Ingresos') {
+      const headers = [
+        'Interno', 'Nombre Socio', 'Ahorro', 'Jefe Línea', 'GPS Julio', 'GPS Marzo', 
+        'Minuto Punta', 'Pro Marzo', 'Sostenimiento', 'Pandemia', 'Retrasado', 
+        'Colaboración', 'Préstamo', 'Interés', 'Pro Sede', 'Pro GPS 2', 'Total General'
+      ];
+      const rows = filteredIngresos.map(r => {
+        const total = r.ahorro + r.jefeLinea + r.gpsJulio + r.gpsMarzo + r.minPunta + 
+                      r.proMarzo + r.sostenimiento + r.pandemia + r.retrasado + 
+                      r.colaboracion + r.prestamo + r.interes + r.proSede + r.proGps2;
+        return [
+          r.interno, r.nombre, r.ahorro, r.jefeLinea, r.gpsJulio, r.gpsMarzo,
+          r.minPunta, r.proMarzo, r.sostenimiento, r.pandemia, r.retrasado,
+          r.colaboracion, r.prestamo, r.interes, r.proSede, r.proGps2, total
+        ];
+      });
+      // Añadir fila de totales
+      rows.push([
+        'TOTALES', 'TODOS', totalsIngresos.ahorro, totalsIngresos.jefeLinea, totalsIngresos.gpsJulio,
+        totalsIngresos.gpsMarzo, totalsIngresos.minPunta, totalsIngresos.proMarzo, totalsIngresos.sostenimiento,
+        totalsIngresos.pandemia, totalsIngresos.retrasado, totalsIngresos.colaboracion, totalsIngresos.prestamo,
+        totalsIngresos.interes, totalsIngresos.proSede, totalsIngresos.proGps2, grandTotalIngresos
+      ]);
+      downloadCSV(`Matriz_Ingresos_Recaudados_${fechaDesde}_${fechaHasta}`, headers, rows);
+    } else {
+      const headers = [
+        'Interno', 'Nombre Socio', 'Sostenimiento Retrasado', 'Inasistencia', 'GPS Julio', 
+        'Pandemia', 'Interés', 'Préstamo', 'Colaboración', 'Promanten', 'Guarda Barro', 
+        'Llanta', 'GPS Marzo', 'Total Deuda'
+      ];
+      const rows = filteredDeudas.map(r => {
+        const total = r.retrasado + r.inasistencia + r.gpsJulio + r.pandemia + r.interes + 
+                      r.prestamo + r.colaboracion + r.promanten + r.guardaBarro + r.llanta + r.gpsMarzo;
+        return [
+          r.interno, r.nombre, r.retrasado, r.inasistencia, r.gpsJulio, r.pandemia,
+          r.interes, r.prestamo, r.colaboracion, r.promanten, r.guardaBarro, r.llanta, r.gpsMarzo, total
+        ];
+      });
+      rows.push([
+        'TOTALES', 'TODOS', totalsDeudas.retrasado, totalsDeudas.inasistencia, totalsDeudas.gpsJulio,
+        totalsDeudas.pandemia, totalsDeudas.interes, totalsDeudas.prestamo, totalsDeudas.colaboracion,
+        totalsDeudas.promanten, totalsDeudas.guardaBarro, totalsDeudas.llanta, totalsDeudas.gpsMarzo, grandTotalDeudas
+      ]);
+      downloadCSV(`Matriz_Deudas_Pendientes_${fechaHasta}`, headers, rows);
+    }
+  };
+
+  // 4. IMPRIMIR VISTA JASPER AISLADA PROFESIONAL (Sin botones ni captura de ventana)
+  const handlePrintJasper = () => {
+    const isIngresos = reportTab === 'recaudados';
+    const title = isIngresos ? 'Ingresos Recaudados por Socio' : 'Deudas Pendientes por Socio';
+    const subtitle = isIngresos 
+      ? `Desde: ${fechaDesde} hasta: ${fechaHasta} | cajero(s): ${selectedCajero} | categoria: ${selectedCategoria} | moneda: ${selectedMoneda} | caja(s): ${selectedCaja}`
+      : `A la fecha: ${fechaHasta} | categoria: ${selectedCategoria} | moneda: ${selectedMoneda} | caja(s): ${selectedCaja}`;
+
+    let theadHTML = '';
+    let tbodyHTML = '';
+    let tfootHTML = '';
+
+    if (isIngresos) {
+      theadHTML = `
+        <tr style="background: #0f172a; color: #ffffff; font-size: 8.5px; text-transform: uppercase;">
+          <th style="padding: 5px; border: 1px solid #475569;">Int.</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Ahorro</th>
+          <th style="padding: 5px; border: 1px solid #475569;">J.Línea</th>
+          <th style="padding: 5px; border: 1px solid #475569;">GPS Jul</th>
+          <th style="padding: 5px; border: 1px solid #475569;">GPS Mar</th>
+          <th style="padding: 5px; border: 1px solid #475569;">M.Punta</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Pro Mar</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Sostenim.</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Pandemia</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Retraso</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Colabor.</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Préstamo</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Interés</th>
+          <th style="padding: 5px; border: 1px solid #475569;">P.Sede</th>
+          <th style="padding: 5px; border: 1px solid #475569;">P.GPS2</th>
+          <th style="padding: 5px; border: 1px solid #475569; background: #b91c1c;">TOTAL</th>
+        </tr>
+      `;
+
+      tbodyHTML = filteredIngresos.map(r => {
+        const total = r.ahorro + r.jefeLinea + r.gpsJulio + r.gpsMarzo + r.minPunta + 
+                      r.proMarzo + r.sostenimiento + r.pandemia + r.retrasado + 
+                      r.colaboracion + r.prestamo + r.interes + r.proSede + r.proGps2;
+        return `
+          <tr style="border-bottom: 1px solid #cbd5e1; font-family: monospace; font-size: 9.5px;">
+            <td style="padding: 4px; text-align: center; font-weight: bold; background: #f8fafc;">${r.interno}</td>
+            <td style="padding: 4px; text-align: right;">${r.ahorro.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.jefeLinea.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.gpsJulio.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.gpsMarzo.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.minPunta.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.proMarzo.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right; font-weight: bold;">${r.sostenimiento.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.pandemia.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.retrasado.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.colaboracion.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right; color: #1d4ed8; font-weight: bold;">${r.prestamo.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.interes.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.proSede.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.proGps2.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right; font-weight: bold; background: #f1f5f9;">${total.toFixed(1)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tfootHTML = `
+        <tr style="background: #e2e8f0; font-weight: bold; font-family: monospace; font-size: 9.5px; border-top: 2px solid #0f172a;">
+          <td style="padding: 5px; text-align: center;">TOTALES</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.ahorro.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.jefeLinea.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.gpsJulio.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.gpsMarzo.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.minPunta.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.proMarzo.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.sostenimiento.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.pandemia.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.retrasado.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.colaboracion.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right; color: #1d4ed8;">${totalsIngresos.prestamo.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.interes.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.proSede.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsIngresos.proGps2.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right; background: #fee2e2; color: #991b1b; font-weight: 900;">Bs ${grandTotalIngresos.toFixed(1)}</td>
+        </tr>
+      `;
+    } else {
+      theadHTML = `
+        <tr style="background: #0f172a; color: #ffffff; font-size: 8.5px; text-transform: uppercase;">
+          <th style="padding: 5px; border: 1px solid #475569;">Int.</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Retrasado</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Inasist.</th>
+          <th style="padding: 5px; border: 1px solid #475569;">GPS Jul</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Pandemia</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Interés</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Préstamo</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Colabor.</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Promanten</th>
+          <th style="padding: 5px; border: 1px solid #475569;">GuardaB.</th>
+          <th style="padding: 5px; border: 1px solid #475569;">Llanta</th>
+          <th style="padding: 5px; border: 1px solid #475569;">GPS Mar</th>
+          <th style="padding: 5px; border: 1px solid #475569; background: #b91c1c;">TOTAL DEUDA</th>
+        </tr>
+      `;
+
+      tbodyHTML = filteredDeudas.map(r => {
+        const total = r.retrasado + r.inasistencia + r.gpsJulio + r.pandemia + r.interes + 
+                      r.prestamo + r.colaboracion + r.promanten + r.guardaBarro + r.llanta + r.gpsMarzo;
+        return `
+          <tr style="border-bottom: 1px solid #cbd5e1; font-family: monospace; font-size: 9.5px;">
+            <td style="padding: 4px; text-align: center; font-weight: bold; background: #f8fafc;">${r.interno}</td>
+            <td style="padding: 4px; text-align: right;">${r.retrasado.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right; color: #e11d48; font-weight: bold;">${r.inasistencia.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.gpsJulio.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.pandemia.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.interes.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right; color: #1d4ed8; font-weight: bold;">${r.prestamo.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.colaboracion.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.promanten.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.guardaBarro.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.llanta.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right;">${r.gpsMarzo.toFixed(1)}</td>
+            <td style="padding: 4px; text-align: right; font-weight: 900; background: #fee2e2; color: #991b1b;">${total.toFixed(1)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tfootHTML = `
+        <tr style="background: #e2e8f0; font-weight: bold; font-family: monospace; font-size: 9.5px; border-top: 2px solid #0f172a;">
+          <td style="padding: 5px; text-align: center;">TOTALES</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.retrasado.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right; color: #e11d48;">${totalsDeudas.inasistencia.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.gpsJulio.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.pandemia.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.interes.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right; color: #1d4ed8;">${totalsDeudas.prestamo.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.colaboracion.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.promanten.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.guardaBarro.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.llanta.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right;">${totalsDeudas.gpsMarzo.toFixed(1)}</td>
+          <td style="padding: 5px; text-align: right; background: #fecaca; color: #7f1d1d; font-weight: 900;">Bs ${grandTotalDeudas.toFixed(1)}</td>
+        </tr>
+      `;
+    }
+
+    const html = `
+      <div style="width: 100%; margin: 0 auto; font-family: 'Inter', sans-serif;">
+        <div style="text-align: center; border-bottom: 2px solid #b91c1c; padding-bottom: 8px; margin-bottom: 10px;">
+          <h2 style="font-size: 15px; font-weight: 900; text-transform: uppercase; color: #0f172a;">RADIO MÓVIL 15 DE ABRIL S.R.L.</h2>
+          <h3 style="font-size: 13px; font-weight: 800; color: #b91c1c; text-transform: uppercase;">${title}</h3>
+          <p style="font-size: 9px; color: #64748b; font-family: monospace; margin-top: 2px;">${subtitle}</p>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #94a3b8;">
+          <thead>${theadHTML}</thead>
+          <tbody>${tbodyHTML}</tbody>
+          <tfoot>${tfootHTML}</tfoot>
+        </table>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; font-size: 9px; color: #64748b; font-family: monospace; border-top: 1px solid #cbd5e1; padding-top: 4px;">
+          <span>SISCOB - Sistema Integral de Cobranza</span>
+          <span>Fecha de Emisión: ${new Date().toLocaleString('es-BO')}</span>
+          <span>JasperViewer Engine v6.20</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-around; text-align: center; font-size: 10px; margin-top: 35px;" class="avoid-break">
+          <div style="width: 35%; border-top: 1px solid #0f172a; padding-top: 4px;">
+            <strong>Firma Presidente</strong><br>
+            <span style="font-size: 9px; color: #64748b;">Directorio Radio Móvil 15 de Abril</span>
+          </div>
+          <div style="width: 35%; border-top: 1px solid #0f172a; padding-top: 4px;">
+            <strong>Firma Tesorero General</strong><br>
+            <span style="font-size: 9px; color: #64748b;">Secretaría de Finanzas</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    printIsolatedDocument(html, title);
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5 animate-fadeIn">
       {/* Top Title & Navigation Tabs */}
-      <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-xs no-print">
+      <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-xs no-print gap-3">
         <div>
           <h1 className="text-lg font-extrabold text-slate-900 flex items-center space-x-2">
             <FileSpreadsheet className="w-5 h-5 text-red-700" />
             <span>Módulo de Matrices y Rendición de Cuentas (JasperReports)</span>
           </h1>
           <p className="text-xs text-slate-500">
-            Reportes matriciales consolidados por socio con selección de fechas, categoría, moneda y cajas
+            Reportes matriciales consolidados por socio con exportación a Excel e impresión limpia
           </p>
         </div>
 
@@ -180,7 +402,7 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
         </div>
       </div>
 
-      {/* Filter Bar (Same for both reports) */}
+      {/* Filter Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3 no-print">
         <div className="flex items-center space-x-2 text-xs font-extrabold text-slate-800 uppercase border-b border-slate-100 pb-2">
           <Filter className="w-4 h-4 text-red-700" />
@@ -190,7 +412,6 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-          {/* Fecha Desde */}
           <div>
             <label className="block font-bold text-slate-600 mb-1">Desde:</label>
             <input
@@ -201,7 +422,6 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
             />
           </div>
 
-          {/* Fecha Hasta */}
           <div>
             <label className="block font-bold text-slate-600 mb-1">Hasta / Al:</label>
             <input
@@ -212,7 +432,6 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
             />
           </div>
 
-          {/* Categoría */}
           <div>
             <label className="block font-bold text-slate-600 mb-1">Categoría:</label>
             <select
@@ -227,7 +446,6 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
             </select>
           </div>
 
-          {/* Moneda */}
           <div>
             <label className="block font-bold text-slate-600 mb-1">Moneda:</label>
             <select
@@ -241,7 +459,6 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
             </select>
           </div>
 
-          {/* Caja(s) */}
           <div>
             <label className="block font-bold text-slate-600 mb-1">Caja(s):</label>
             <select
@@ -256,7 +473,6 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
             </select>
           </div>
 
-          {/* Cajero (Solo relevante para recaudados, desactivable en deudas) */}
           <div>
             <label className="block font-bold text-slate-600 mb-1">
               {reportTab === 'recaudados' ? 'Cajero(s):' : 'Operador:'}
@@ -290,14 +506,16 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
           <div className="flex space-x-2">
             <button
               onClick={() => handleExportExcel(reportTab === 'recaudados' ? 'Ingresos' : 'Deudas')}
-              className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
+              className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
+              title="Descargar archivo CSV compatible con Excel"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Exportar Excel</span>
+              <span>Exportar Excel (.csv)</span>
             </button>
             <button
-              onClick={() => window.print()}
-              className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs"
+              onClick={handlePrintJasper}
+              className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
+              title="Imprimir reporte sin capturar la pantalla"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Imprimir Vista Jasper</span>
@@ -307,17 +525,17 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
       </div>
 
       {/* ========================================================================= */}
-      {/* VISTA 1: INGRESOS RECAUDADOS POR SOCIO (JASPERVIEWER MATRIZ) */}
+      {/* VISTA 1: INGRESOS RECAUDADOS POR SOCIO */}
       {/* ========================================================================= */}
       {reportTab === 'recaudados' && (
-        <div id="printable-area" className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden p-6 text-slate-800">
+        <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden p-6 text-slate-800">
           <div className="bg-slate-200/80 border border-slate-300 rounded-lg p-2 flex items-center justify-between text-xs text-slate-600 mb-4 no-print">
             <div className="flex items-center space-x-2">
               <FileText className="w-4 h-4 text-red-700" />
               <span className="font-bold text-slate-800">JasperViewer - Ingresos Recaudados por Socio.jrxml</span>
             </div>
             <div className="flex items-center space-x-3 text-[11px] font-mono">
-              <span>Página 1 de 4</span>
+              <span>{filteredIngresos.length} Registros</span>
               <span>Zoom: 100%</span>
             </div>
           </div>
@@ -422,17 +640,17 @@ Total: Bs ${(tipo === 'Ingresos' ? grandTotalIngresos : grandTotalDeudas).toFixe
       )}
 
       {/* ========================================================================= */}
-      {/* VISTA 2: DEUDAS PENDIENTES POR SOCIO (EXACTA MATRIZ JASPERVIEWER) */}
+      {/* VISTA 2: DEUDAS PENDIENTES POR SOCIO */}
       {/* ========================================================================= */}
       {reportTab === 'deudas' && (
-        <div id="printable-area" className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden p-6 text-slate-800">
+        <div className="bg-white rounded-2xl border border-slate-300 shadow-sm overflow-hidden p-6 text-slate-800">
           <div className="bg-slate-200/80 border border-slate-300 rounded-lg p-2 flex items-center justify-between text-xs text-slate-600 mb-4 no-print">
             <div className="flex items-center space-x-2">
               <FileText className="w-4 h-4 text-red-700" />
               <span className="font-bold text-slate-800">JasperViewer - Deudas Pendientes por Socio.jrxml</span>
             </div>
             <div className="flex items-center space-x-3 text-[11px] font-mono">
-              <span>Página 1 de 4</span>
+              <span>{filteredDeudas.length} Registros</span>
               <span>Zoom: 100%</span>
             </div>
           </div>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { createEgresoAPI, createDeudaAPI } from '../utils/api';
+import { printIsolatedDocument, generatePlanDePagosHTML } from '../utils/printHelper';
 
 const DEFAULT_PRESTAMOS = [
   { folio: 'PR-2026-0891', socio: 'Carlos Mendoza', socioId: 12, original: 50000, saldo: 12500, cuota: 2486.21, plazo: 24, vencimiento: '15/09/2026', estado: 'AL DÍA' },
@@ -560,95 +561,136 @@ export default function PrestamosPage({
 
       {/* Printable Plan de Pagos Modal */}
       {showPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn print:static print:inset-auto print:bg-white print:p-0 print:overflow-visible">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 print:shadow-none print:border-none print:max-w-none print:w-full print:overflow-visible">
-            <div className="bg-slate-900 text-white px-5 py-3.5 flex justify-between items-center no-print">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden border border-slate-200">
+            <div className="bg-slate-900 text-white px-6 py-4 flex justify-between items-center no-print">
               <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4 text-red-400" />
-                <h3 className="font-bold text-sm">
-                  {activePlanData ? `Plan de Pagos Oficial (${activePlanData.folio})` : 'Plan de Pagos / Tabla de Amortización'}
-                </h3>
+                <FileText className="w-5 h-5 text-red-400" />
+                <div>
+                  <h3 className="font-extrabold text-sm tracking-wide uppercase">
+                    {activePlanData ? `Plan de Pagos Oficial (${activePlanData.folio})` : 'Plan de Pagos / Tabla de Amortización'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400">Documento contractual oficial para firma del socio y directorio</p>
+                </div>
               </div>
               <div className="flex space-x-2">
                 <button
-                  onClick={() => window.print()}
-                  className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
+                  onClick={() => {
+                    const data = activePlanData || {
+                      folio: 'PR-2026-SIM',
+                      socio: selectedSocio ? `${selectedSocio.nombres} ${selectedSocio.apPaterno}` : 'Socio Solicitante',
+                      socioCI: selectedSocio?.ci || 'S/N',
+                      socioMovil: selectedSocio?.id || '0',
+                      monto,
+                      plazo,
+                      tasaAnual,
+                      cuotaMensual: currentCalc.cuotaMensual,
+                      planPagos: currentCalc.planPagos
+                    };
+                    const html = generatePlanDePagosHTML(data);
+                    printIsolatedDocument(html, `Plan_de_Pagos_${data.folio}`);
+                  }}
+                  className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Imprimir Plan</span>
+                  <Printer className="w-4 h-4" />
+                  <span>Imprimir Plan Limpio</span>
                 </button>
-                <button onClick={() => setShowPlanModal(false)} className="text-slate-400 hover:text-white cursor-pointer p-1 font-bold">✕</button>
+                <button onClick={() => setShowPlanModal(false)} className="text-slate-400 hover:text-white cursor-pointer p-1 font-bold text-lg">✕</button>
               </div>
             </div>
 
-            <div id="printable-area" className="p-6 text-xs space-y-4 max-h-[75vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0 print:m-0">
-              <div className="text-center border-b pb-3 space-y-1">
-                <h2 className="font-black text-lg uppercase tracking-wider text-slate-900">
-                  RADIO MÓVIL 15 DE ABRIL S.R.L.
-                </h2>
-                <p className="text-xs font-bold text-red-800 uppercase tracking-wide">
-                  TABLA DE AMORTIZACIÓN Y PLAN DE PAGOS OFICIAL
-                </p>
-                {activePlanData && (
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-left grid grid-cols-2 gap-2 text-[11px] my-2">
-                    <div>
-                      <span className="text-slate-500">Socio Titular:</span>{' '}
-                      <strong className="text-slate-900">{activePlanData.socio} (Móvil #{activePlanData.socioMovil})</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">C.I.:</span>{' '}
-                      <strong className="text-slate-900">{activePlanData.socioCI}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Folio Contrato:</span>{' '}
-                      <strong className="font-mono text-red-700">{activePlanData.folio}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Fecha de Concesión:</span>{' '}
-                      <strong className="text-slate-900">{new Date().toLocaleDateString('es-BO')}</strong>
+            <div className="p-6 text-xs space-y-4 max-h-[75vh] overflow-y-auto bg-slate-50">
+              {/* Preview Container styled as Paper Document */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-300 shadow-sm space-y-4">
+                <div className="text-center border-b-2 border-red-700 pb-3 space-y-1">
+                  <h2 className="font-black text-lg uppercase tracking-wider text-slate-900">
+                    ASOCIACIÓN DE TRANSPORTE "RADIO MÓVIL 15 DE ABRIL" S.R.L.
+                  </h2>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Personería Jurídica N° 458/98 • NIT: 1028374029 • Tarija, Bolivia
+                  </p>
+                  <div className="inline-block bg-red-700 text-white font-extrabold text-xs px-4 py-1 rounded mt-1 uppercase tracking-wide">
+                    TABLA DE AMORTIZACIÓN Y PLAN DE PAGOS OFICIAL
+                  </div>
+                </div>
+
+                {/* Info Cards Grid */}
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                    <span className="font-extrabold text-[10px] text-red-700 uppercase block border-b pb-1">
+                      Datos del Prestatario (Socio)
+                    </span>
+                    <div><span className="text-slate-500">Socio:</span> <strong>{activePlanData?.socio || 'Socio Solicitante'}</strong></div>
+                    <div><span className="text-slate-500">Móvil Interno:</span> <strong className="font-mono text-red-700 font-bold">#{activePlanData?.socioMovil || '0'}</strong></div>
+                    <div><span className="text-slate-500">C.I.:</span> <strong>{activePlanData?.socioCI || 'S/N'}</strong></div>
+                  </div>
+
+                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1 font-mono">
+                    <span className="font-extrabold text-[10px] text-red-700 uppercase block border-b pb-1 font-sans">
+                      Condiciones del Crédito
+                    </span>
+                    <div><span className="text-slate-500 font-sans">Folio:</span> <strong className="text-red-700">{activePlanData?.folio || 'PR-2026-SIM'}</strong></div>
+                    <div><span className="text-slate-500 font-sans">Capital:</span> <strong>Bs {(activePlanData?.monto || monto).toLocaleString()}</strong></div>
+                    <div><span className="text-slate-500 font-sans">Plazo:</span> <strong>{activePlanData?.plazo || plazo} Meses</strong> | Tasa: <strong>{activePlanData?.tasaAnual || tasaAnual}% Anual</strong></div>
+                  </div>
+                </div>
+
+                {/* Card Cuota Mensual Fija */}
+                <div className="flex justify-between items-center bg-red-50 p-3 rounded-xl border border-red-200">
+                  <div>
+                    <span className="text-[10px] font-bold text-red-800 uppercase block">Cuota Mensual Fija:</span>
+                    <div className="text-xl font-black font-mono text-red-700">
+                      Bs {(activePlanData?.cuotaMensual || currentCalc.cuotaMensual).toFixed(2)}
                     </div>
                   </div>
-                )}
-                <div className="flex justify-center space-x-4 text-slate-600 mt-1 font-mono text-[11px]">
-                  <span>Capital: Bs {(activePlanData?.monto || monto).toLocaleString()}</span>
-                  <span>•</span>
-                  <span>Plazo: {activePlanData?.plazo || plazo} Meses</span>
-                  <span>•</span>
-                  <span>Tasa: {activePlanData?.tasaAnual || tasaAnual}% Anual</span>
+                  <div className="text-right font-mono text-[11px]">
+                    <div><span className="text-slate-500 font-sans">Total a Pagar:</span> <strong>Bs {(activePlanData ? (activePlanData.cuotaMensual * activePlanData.plazo) : currentCalc.totalPagar).toFixed(2)}</strong></div>
+                    <div><span className="text-slate-500 font-sans">Interés Total:</span> <strong className="text-red-700">Bs {(activePlanData ? ((activePlanData.cuotaMensual * activePlanData.plazo) - activePlanData.monto) : currentCalc.totalInteres).toFixed(2)}</strong></div>
+                  </div>
                 </div>
-              </div>
 
-              <table className="w-full text-left font-mono">
-                <thead className="bg-slate-100 text-slate-700 font-bold border-b">
-                  <tr>
-                    <th className="p-2 text-center">Nro</th>
-                    <th className="p-2 text-right">Cuota Fija</th>
-                    <th className="p-2 text-right">Capital</th>
-                    <th className="p-2 text-right">Interés</th>
-                    <th className="p-2 text-right">Saldo Deudor</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(activePlanData?.planPagos || currentCalc.planPagos).map((p) => (
-                    <tr key={p.nro} className="hover:bg-slate-50">
-                      <td className="p-2 text-center font-bold text-slate-500">{p.nro}</td>
-                      <td className="p-2 text-right font-bold text-slate-900">{p.cuota.toFixed(2)}</td>
-                      <td className="p-2 text-right text-emerald-700 font-semibold">{p.capital.toFixed(2)}</td>
-                      <td className="p-2 text-right text-amber-700 font-semibold">{p.interes.toFixed(2)}</td>
-                      <td className="p-2 text-right text-slate-800 font-bold">{p.saldo.toFixed(2)}</td>
+                {/* Table */}
+                <table className="w-full text-left font-mono border-collapse">
+                  <thead className="bg-slate-900 text-white font-bold text-[10px] uppercase">
+                    <tr>
+                      <th className="p-2 text-center">Nro</th>
+                      <th className="p-2 text-right">Cuota Fija (Bs)</th>
+                      <th className="p-2 text-right">Capital</th>
+                      <th className="p-2 text-right">Interés</th>
+                      <th className="p-2 text-right">Saldo Deudor</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {(activePlanData?.planPagos || currentCalc.planPagos).map((p) => (
+                      <tr key={p.nro} className="hover:bg-slate-50">
+                        <td className="p-2 text-center font-bold text-slate-500">{p.nro}</td>
+                        <td className="p-2 text-right font-bold text-slate-900">{p.cuota.toFixed(2)}</td>
+                        <td className="p-2 text-right text-emerald-700 font-semibold">{p.capital.toFixed(2)}</td>
+                        <td className="p-2 text-right text-amber-700 font-semibold">{p.interes.toFixed(2)}</td>
+                        <td className="p-2 text-right text-slate-800 font-bold">{p.saldo.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-              <div className="grid grid-cols-2 gap-8 pt-8 text-center text-slate-600 firmas-container no-page-break">
-                <div className="border-t border-slate-400 pt-2 font-bold">
-                  Firma del Socio Prestatario
-                  <br /><span className="text-[10px] font-normal">Conformidad de Recepción</span>
+                {/* Legal & Signatures */}
+                <div className="border border-dashed border-slate-300 p-2.5 rounded-lg text-[10px] text-slate-600">
+                  <strong>COMPROMISO DE PAGO:</strong> El socio se compromete a cancelar puntualmente sus cuotas en Caja Central hasta el 15 de cada mes.
                 </div>
-                <div className="border-t border-slate-400 pt-2 font-bold">
-                  Firma Tesorería / Directorio
-                  <br /><span className="text-[10px] font-normal">Radio Móvil 15 de Abril</span>
+
+                <div className="grid grid-cols-3 gap-4 pt-6 text-center text-[10px] text-slate-600">
+                  <div className="border-t border-slate-400 pt-2 font-bold">
+                    Firma Prestatario
+                    <br /><span className="text-[9px] font-normal">Huella Dactilar</span>
+                  </div>
+                  <div className="border-t border-slate-400 pt-2 font-bold">
+                    Secretaría General
+                    <br /><span className="text-[9px] font-normal">Radio Móvil 15 de Abril</span>
+                  </div>
+                  <div className="border-t border-slate-400 pt-2 font-bold">
+                    Tesorería General
+                    <br /><span className="text-[9px] font-normal">Radio Móvil 15 de Abril</span>
+                  </div>
                 </div>
               </div>
             </div>

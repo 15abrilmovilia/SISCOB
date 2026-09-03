@@ -1,11 +1,70 @@
 import React from 'react';
 import { Printer, X, FileText } from 'lucide-react';
+import { printIsolatedDocument } from '../utils/printHelper';
 
 export default function VoucherModal({ voucher, onClose }) {
   if (!voucher) return null;
 
   const handlePrint = () => {
-    window.print();
+    const html = `
+      <div style="max-width: 650px; margin: 0 auto; padding: 20px; border: 2px solid #0f172a; border-radius: 8px; font-family: 'Inter', sans-serif;">
+        <div style="text-align: right; font-family: monospace; font-weight: bold; color: #64748b; font-size: 12px; margin-bottom: 4px;">
+          Nro: #${voucher.nroBoleta || voucher.id}
+        </div>
+        <div style="text-align: center; border-bottom: 2px solid #b91c1c; padding-bottom: 8px; margin-bottom: 12px;">
+          <h2 style="font-size: 16px; font-weight: 900; color: #0f172a; text-transform: uppercase;">RADIO MÓVIL 15 DE ABRIL S.R.L.</h2>
+          <p style="font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase;">COMPROBANTE OFICIAL DE EGRESO</p>
+          <div style="display: inline-block; background: #991b1b; color: white; padding: 2px 10px; font-size: 11px; font-weight: bold; border-radius: 4px; margin-top: 4px;">
+            RUBRO: ${voucher.grupo || voucher.categoria}
+          </div>
+        </div>
+
+        <div style="font-size: 11px; line-height: 1.8; margin-bottom: 12px; background: #f8fafc; padding: 10px; border-radius: 6px;">
+          <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px;">
+            <span style="color: #64748b;">Pagado a (Beneficiario):</span>
+            <strong style="text-transform: uppercase; color: #0f172a;">${voucher.pagadoA}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; margin-top: 4px;">
+            <span style="color: #64748b;">Fecha:</span>
+            <strong style="font-family: monospace;">${voucher.fecha}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+            <span style="color: #64748b;">Documento de Respaldo:</span>
+            <strong style="font-family: monospace;">${voucher.conDocumento || 'S/D'}</strong>
+          </div>
+        </div>
+
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; margin-bottom: 14px; background: #ffffff;">
+          <div style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #64748b; margin-bottom: 4px;">Concepto Detallado:</div>
+          <p style="font-size: 12px; font-weight: 600; color: #0f172a;">${voucher.descripcion}</p>
+          ${voucher.observaciones ? `<p style="font-size: 10px; color: #64748b; margin-top: 4px; font-style: italic;">Obs: ${voucher.observaciones}</p>` : ''}
+        </div>
+
+        <div style="border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a; padding: 8px 0; display: flex; justify-content: space-between; align-items: center; margin-bottom: 35px;">
+          <span style="font-weight: 900; font-size: 13px;">TOTAL CANCELADO:</span>
+          <span style="font-family: monospace; font-size: 18px; font-weight: 900; color: #b91c1c;">
+            ${voucher.moneda || 'Bs'} ${parseFloat(voucher.monto).toFixed(2)}
+          </span>
+        </div>
+
+        <div style="display: flex; justify-content: space-around; text-align: center; font-size: 11px; margin-top: 40px;">
+          <div style="width: 40%; border-top: 1.5px solid #0f172a; padding-top: 6px;">
+            <strong>Directiva / Tesorería</strong><br>
+            <span style="font-size: 10px; color: #64748b;">Firma Responsable</span>
+          </div>
+          <div style="width: 40%; border-top: 1.5px solid #0f172a; padding-top: 6px;">
+            <strong>${voucher.pagadoA}</strong><br>
+            <span style="font-size: 10px; color: #64748b;">Firma Beneficiario</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 25px; padding-top: 6px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: monospace;">
+          <span>boleta_egreso - Documento Oficial SISCOB</span>
+          <span>Responsable: ${voucher.usuario || 'Directiva'}</span>
+        </div>
+      </div>
+    `;
+    printIsolatedDocument(html, `Boleta_Egreso_${voucher.nroBoleta || voucher.id}`);
   };
 
   return (

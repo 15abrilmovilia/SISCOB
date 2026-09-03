@@ -1,5 +1,6 @@
 import React from 'react';
 import { Printer, CheckCircle, Share2, X, MessageSquare } from 'lucide-react';
+import { printIsolatedDocument, generateReceiptHTML } from '../utils/printHelper';
 
 export default function ReceiptModal({ isOpen, onClose, data, receipt, printMode = 'termico' }) {
   // Support both receipt and data prop names
@@ -48,7 +49,8 @@ export default function ReceiptModal({ isOpen, onClose, data, receipt, printMode
   };
 
   const handlePrint = () => {
-    window.print();
+    const html = generateReceiptHTML(receiptData, printMode);
+    printIsolatedDocument(html, `Recibo_${receiptData.nroRecibo}`);
   };
 
   return (
