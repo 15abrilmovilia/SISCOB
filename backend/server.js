@@ -426,6 +426,54 @@ app.delete('/api/egresos/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// 7. Usuarios y Roles Endpoints
+let memoryUsuarios = [
+  { id: 'u1', usuario: 'admin33', password: '123', nombreCompleto: 'Administrador Central (SISCOB)', email: 'admin@radiomovil15deabril.com', celular: '7141199', rolId: 'admin', estado: 'ACTIVO', fechaCreacion: '2025-01-10', ultimoAcceso: '03/09/2026, 11:15' },
+  { id: 'u2', usuario: 'cajera01', password: '123', nombreCompleto: 'Daniela Condori Vargas', email: 'daniela.caja@radiomovil15deabril.com', celular: '75483109', rolId: 'cajero', estado: 'ACTIVO', fechaCreacion: '2025-03-15', ultimoAcceso: '03/09/2026, 10:45' },
+  { id: 'u3', usuario: 'hacienda15', password: '123', nombreCompleto: 'Rubén Aguirre Méndez', email: 'hacienda@radiomovil15deabril.com', celular: '72910482', rolId: 'hacienda', estado: 'ACTIVO', fechaCreacion: '2025-02-01', ultimoAcceso: '02/09/2026, 18:20' }
+];
+
+app.get('/api/usuarios', (req, res) => {
+  res.json(memoryUsuarios);
+});
+
+app.post('/api/usuarios', (req, res) => {
+  const { usuario, password, nombreCompleto, email, celular, rolId, estado } = req.body;
+  if (!usuario || !password || !nombreCompleto) {
+    return res.status(400).json({ error: 'Usuario, contraseña y nombre completo son obligatorios.' });
+  }
+  const nuevo = {
+    id: `u-${Date.now()}`,
+    usuario: usuario.trim().toLowerCase(),
+    password,
+    nombreCompleto,
+    email: email || '',
+    celular: celular || '',
+    rolId: rolId || 'cajero',
+    estado: estado || 'ACTIVO',
+    fechaCreacion: new Date().toISOString().split('T')[0],
+    ultimoAcceso: 'Sin ingresos registrados'
+  };
+  memoryUsuarios.push(nuevo);
+  res.status(201).json(nuevo);
+});
+
+app.put('/api/usuarios/:id', (req, res) => {
+  const { id } = req.params;
+  const index = memoryUsuarios.findIndex(u => u.id === id || u.usuario === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Usuario no encontrado' });
+  }
+  memoryUsuarios[index] = { ...memoryUsuarios[index], ...req.body };
+  res.json(memoryUsuarios[index]);
+});
+
+app.delete('/api/usuarios/:id', (req, res) => {
+  const { id } = req.params;
+  memoryUsuarios = memoryUsuarios.filter(u => u.id !== id && u.usuario !== id);
+  res.json({ success: true });
+});
+
 // Start Server (using native node execution, no nodemon)
 app.listen(PORT, () => {
   console.log(`[SISCOB API] Servidor activo escuchando en el puerto ${PORT}`);

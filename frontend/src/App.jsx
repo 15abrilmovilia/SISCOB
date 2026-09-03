@@ -17,13 +17,16 @@ import ConciliacionPage from './pages/ConciliacionPage';
 import AuditoriaPage from './pages/AuditoriaPage';
 import FichaTecnicaPage from './pages/FichaTecnicaPage';
 import ConfigPage from './pages/ConfigPage';
+import UsuariosRolesPage from './pages/UsuariosRolesPage';
 import NewSocioModal from './components/NewSocioModal';
 
 import { 
   INITIAL_SOCIOS, 
   INITIAL_DEUDAS, 
   INITIAL_CAJAS, 
-  INITIAL_EGRESOS 
+  INITIAL_EGRESOS,
+  INITIAL_USERS,
+  INITIAL_ROLES
 } from './data/mockData';
 
 import { 
@@ -40,7 +43,8 @@ import {
   updateSocioAPI,
   getCajasAPI, 
   getDeudasAPI, 
-  getEgresosAPI 
+  getEgresosAPI,
+  getUsuariosAPI
 } from './utils/api';
 
 export default function App() {
@@ -55,21 +59,25 @@ export default function App() {
   const [deudas, setDeudas] = useState(() => loadFromStorage(STORAGE_KEYS.DEUDAS, INITIAL_DEUDAS));
   const [cajas, setCajas] = useState(() => loadFromStorage(STORAGE_KEYS.CAJAS, INITIAL_CAJAS));
   const [egresos, setEgresos] = useState(() => loadFromStorage(STORAGE_KEYS.EGRESOS, INITIAL_EGRESOS));
+  const [usuarios, setUsuarios] = useState(() => loadFromStorage(STORAGE_KEYS.USUARIOS, INITIAL_USERS));
+  const [roles, setRoles] = useState(() => loadFromStorage(STORAGE_KEYS.ROLES, INITIAL_ROLES));
 
   // Sync with Supabase on mount
   useEffect(() => {
     async function syncCloud() {
       try {
-        const [cloudSocios, cloudCajas, cloudDeudas, cloudEgresos] = await Promise.all([
+        const [cloudSocios, cloudCajas, cloudDeudas, cloudEgresos, cloudUsuarios] = await Promise.all([
           getSociosAPI(),
           getCajasAPI(),
           getDeudasAPI(),
-          getEgresosAPI()
+          getEgresosAPI(),
+          getUsuariosAPI()
         ]);
         if (cloudSocios && cloudSocios.length > 0) setSocios(cloudSocios);
         if (cloudCajas && cloudCajas.length > 0) setCajas(cloudCajas);
         if (cloudDeudas && cloudDeudas.length > 0) setDeudas(cloudDeudas);
         if (cloudEgresos && cloudEgresos.length > 0) setEgresos(cloudEgresos);
+        if (cloudUsuarios && cloudUsuarios.length > 0) setUsuarios(cloudUsuarios);
       } catch (err) {
         console.warn('Sync fallback local:', err);
       }
@@ -99,6 +107,14 @@ export default function App() {
   }, [egresos]);
 
   useEffect(() => {
+    saveToStorage(STORAGE_KEYS.USUARIOS, usuarios);
+  }, [usuarios]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.ROLES, roles);
+  }, [roles]);
+
+  useEffect(() => {
     if (currentUser) {
       saveToStorage(STORAGE_KEYS.USER, currentUser);
     } else {
@@ -115,18 +131,20 @@ export default function App() {
   };
 
   const handleExportBackup = () => {
-    exportBackupData({ socios, deudas, cajas, egresos });
+    exportBackupData({ socios, deudas, cajas, egresos, usuarios, roles });
   };
 
   const handleImportBackup = (file) => {
     importBackupFile(
       file,
-      (imported) => {
-        setSocios(imported.socios);
-        setDeudas(imported.deudas);
-        setCajas(imported.cajas);
-        setEgresos(imported.egresos);
-        alert('Copia de seguridad restaurada exitosamente.');
+      (data) => {
+        if (data.socios) setSocios(data.socios);
+        if (data.deudas) setDeudas(data.deudas);
+        if (data.cajas) setCajas(data.cajas);
+        if (data.egresos) setEgresos(data.egresos);
+        if (data.usuarios) setUsuarios(data.usuarios);
+        if (data.roles) setRoles(data.roles);
+        alert('Datos restaurados correctamente desde el respaldo.');
       },
       (error) => {
         alert(`Error al importar respaldo: ${error}`);
@@ -185,7 +203,7 @@ export default function App() {
   };
 
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} />;
+    return <LoginScreen onLogin={handleLogin} usuarios={usuarios} roles={roles} />;
   }
 
   return (
@@ -196,6 +214,8 @@ export default function App() {
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
         onLogout={handleLogout}
+        currentUser={currentUser}
+        roles={roles}
       />
 
       <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'lg:pl-64' : 'pl-0'}`}>
@@ -316,6 +336,15 @@ export default function App() {
             <ConfigPage 
               printMode={printMode}
               setPrintMode={setPrintMode}
+              currentUser={currentUser}
+            />
+          )}
+          {activeTab === 'usuarios' && (
+            <UsuariosRolesPage 
+              usuarios={usuarios}
+              setUsuarios={setUsuarios}
+              roles={roles}
+              setRoles={setRoles}
               currentUser={currentUser}
             />
           )}

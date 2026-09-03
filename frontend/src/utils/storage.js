@@ -5,7 +5,9 @@ const STORAGE_KEYS = {
   CAJAS: 'siscob_cajas',
   EGRESOS: 'siscob_egresos',
   USER: 'siscob_auth_user',
-  SETTINGS: 'siscob_settings'
+  SETTINGS: 'siscob_settings',
+  USUARIOS: 'siscob_usuarios',
+  ROLES: 'siscob_roles'
 };
 
 export function loadFromStorage(key, defaultValue) {
@@ -36,7 +38,9 @@ export function exportBackupData(data) {
       socios: data.socios,
       deudas: data.deudas,
       cajas: data.cajas,
-      egresos: data.egresos
+      egresos: data.egresos,
+      usuarios: data.usuarios,
+      roles: data.roles
     }
   };
 

@@ -14,12 +14,13 @@ import {
   FileText, 
   FileCheck,
   GitPullRequest,
+  UserCheck,
   LogOut,
   X 
 } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout }) {
-  const menuItems = [
+export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout, currentUser, roles = [] }) {
+  const allMenuItems = [
     { id: 'dashboard', label: 'DASHBOARD', icon: LayoutDashboard },
     { id: 'socios', label: 'SOCIOS', icon: Users },
     { id: 'cuotas', label: 'CUOTAS Y MULTAS', icon: Sliders },
@@ -34,7 +35,14 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
     { id: 'auditoria', label: 'BITÁCORA AUDITORÍA', icon: ShieldCheck },
     { id: 'ficha', label: 'FICHA TÉCNICA / CLIENTE', icon: FileText },
     { id: 'config', label: 'CONFIGURACIÓN', icon: Settings },
+    { id: 'usuarios', label: 'USUARIOS Y ROLES', icon: UserCheck }
   ];
+
+  // Filtrar según el rol del usuario si existe restricción
+  const userRole = roles.find(r => r.id === currentUser?.rol || r.id === currentUser?.rolId);
+  const menuItems = userRole && userRole.modulos && userRole.modulos.length > 0 && userRole.id !== 'admin'
+    ? allMenuItems.filter(item => userRole.modulos.includes(item.id))
+    : allMenuItems;
 
   return (
     <>
@@ -111,8 +119,12 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
                 <ShieldCheck className="w-3.5 h-3.5" />
               </div>
               <div className="truncate">
-                <div className="text-xs font-extrabold text-slate-900 truncate">SISCOB 15A</div>
-                <div className="text-[10px] text-slate-500 font-medium">En Línea</div>
+                <div className="text-xs font-extrabold text-slate-900 truncate">
+                  {currentUser?.nombre || currentUser?.nombreCompleto || 'SISCOB 15A'}
+                </div>
+                <div className="text-[10px] text-red-700 font-bold uppercase truncate">
+                  {userRole?.nombre || currentUser?.rol || 'En Línea'}
+                </div>
               </div>
             </div>
             <button

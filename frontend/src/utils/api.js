@@ -157,3 +157,57 @@ export async function deleteEgresoAPI(id) {
     return false;
   }
 }
+
+// Usuarios y Roles API
+export async function getUsuariosAPI() {
+  try {
+    const res = await fetch(`${API_BASE}/api/usuarios`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Fallback usuarios locales:', err.message);
+    return null;
+  }
+}
+
+export async function createUsuarioAPI(usuarioData) {
+  try {
+    const res = await fetch(`${API_BASE}/api/usuarios`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(usuarioData)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al guardar usuario remoto:', err.message);
+    return null;
+  }
+}
+
+export async function updateUsuarioAPI(id, usuarioData) {
+  try {
+    const res = await fetch(`${API_BASE}/api/usuarios/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(usuarioData)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al actualizar usuario remoto:', err.message);
+    return null;
+  }
+}
+
+export async function deleteUsuarioAPI(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/usuarios/${id}`, {
+      method: 'DELETE'
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[SISCOB API] Error al eliminar usuario remoto:', err.message);
+    return false;
+  }
+}
