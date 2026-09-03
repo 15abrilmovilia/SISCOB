@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, CheckSquare, Square, Printer, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
+import { registrarCobranzaAPI } from '../utils/api';
 
 export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCajas, preselectedSocioId, printMode }) {
   const [selectedSocioId, setSelectedSocioId] = useState(preselectedSocioId || 20);
@@ -33,7 +34,7 @@ export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCaj
   const totalSus = selectedItems.filter(d => d.moneda === '$us').reduce((acc, curr) => acc + curr.monto, 0);
   const totalDeudaAcumulada = socioDeudas.reduce((acc, curr) => acc + curr.monto, 0);
 
-  const handleCobrar = () => {
+  const handleCobrar = async () => {
     if (selectedItems.length === 0) {
       alert('Por favor marque al menos una deuda pendiente para cobrar.');
       return;
@@ -53,6 +54,17 @@ export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCaj
       observaciones
     };
 
+    // Registrar en Supabase a través de Railway
+    await registrarCobranzaAPI({
+      nroRecibo: `REC-${nroRecibo}`,
+      socioId: activeSocio.id,
+      cajaId: 'c1',
+      total: totalBs,
+      metodoPago: 'Efectivo',
+      cajero: 'Cajero Central',
+      deudaIds: selectedDeudaIds
+    });
+
     // Mark deudas as paid
     const updatedDeudas = deudas.map(d => 
       selectedDeudaIds.includes(d.id) ? { ...d, pagado: true, nroRecibo } : d
@@ -61,7 +73,7 @@ export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCaj
 
     // Add to Caja General
     const updatedCajas = cajas.map(c => 
-      c.id === 'c1' ? { ...c, ingresos: c.ingresos + totalBs } : c
+      c.id === 'c1' ? { ...c, ingresos: c.ingresos + totalBs, saldoActual: (c.saldoActual || 0) + totalBs } : c
     );
     setCajas(updatedCajas);
 

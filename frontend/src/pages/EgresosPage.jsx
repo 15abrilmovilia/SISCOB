@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TrendingDown, Plus, FileText, Printer, CheckCircle } from 'lucide-react';
 import VoucherModal from '../components/VoucherModal';
+import { createEgresoAPI } from '../utils/api';
 
 export default function EgresosPage({ egresos, setEgresos, cajas, setCajas }) {
   const [selectedVoucher, setSelectedVoucher] = useState(null);
@@ -16,17 +17,29 @@ export default function EgresosPage({ egresos, setEgresos, cajas, setCajas }) {
     observaciones: ''
   });
 
-  const handleSaveEgreso = (e) => {
+  const handleSaveEgreso = async (e) => {
     e.preventDefault();
     if (!formData.descripcion || !formData.pagadoA || !formData.monto) {
       alert('Por favor complete la descripción, el beneficiario y el monto.');
       return;
     }
 
-    const newId = Math.max(...egresos.map(eg => eg.id), 11800) + 1;
     const montoNum = parseFloat(formData.monto);
-    const newEgreso = {
-      id: newId,
+    const nroBoleta = `EGR-${Date.now().toString().slice(-5)}`;
+    const egresoPayload = {
+      nroBoleta,
+      cajaId: formData.cajaId,
+      categoria: formData.grupo,
+      beneficiario: formData.pagadoA.toUpperCase(),
+      concepto: formData.descripcion.toUpperCase(),
+      monto: montoNum,
+      responsable: 'DANIELA'
+    };
+
+    // Guardar en Supabase a través de Railway
+    const savedRemote = await createEgresoAPI(egresoPayload);
+    const newEgreso = savedRemote || {
+      id: Math.max(...egresos.map(eg => eg.id), 11800) + 1,
       fecha: new Date().toISOString().split('T')[0],
       grupo: formData.grupo,
       descripcion: formData.descripcion.toUpperCase(),
@@ -43,7 +56,7 @@ export default function EgresosPage({ egresos, setEgresos, cajas, setCajas }) {
 
     // Update Caja Egresos
     const updatedCajas = cajas.map(c => 
-      c.id === formData.cajaId ? { ...c, egresos: c.egresos + montoNum } : c
+      c.id === formData.cajaId ? { ...c, egresos: c.egresos + montoNum, saldoActual: c.saldoActual - montoNum } : c
     );
     setCajas(updatedCajas);
 

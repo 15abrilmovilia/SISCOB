@@ -34,6 +34,14 @@ import {
   STORAGE_KEYS 
 } from './utils/storage';
 
+import { 
+  getSociosAPI, 
+  createSocioAPI, 
+  getCajasAPI, 
+  getDeudasAPI, 
+  getEgresosAPI 
+} from './utils/api';
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => 
     loadFromStorage(STORAGE_KEYS.USER, null)
@@ -46,6 +54,27 @@ export default function App() {
   const [deudas, setDeudas] = useState(() => loadFromStorage(STORAGE_KEYS.DEUDAS, INITIAL_DEUDAS));
   const [cajas, setCajas] = useState(() => loadFromStorage(STORAGE_KEYS.CAJAS, INITIAL_CAJAS));
   const [egresos, setEgresos] = useState(() => loadFromStorage(STORAGE_KEYS.EGRESOS, INITIAL_EGRESOS));
+
+  // Sync with Supabase on mount
+  useEffect(() => {
+    async function syncCloud() {
+      try {
+        const [cloudSocios, cloudCajas, cloudDeudas, cloudEgresos] = await Promise.all([
+          getSociosAPI(),
+          getCajasAPI(),
+          getDeudasAPI(),
+          getEgresosAPI()
+        ]);
+        if (cloudSocios && cloudSocios.length > 0) setSocios(cloudSocios);
+        if (cloudCajas && cloudCajas.length > 0) setCajas(cloudCajas);
+        if (cloudDeudas && cloudDeudas.length > 0) setDeudas(cloudDeudas);
+        if (cloudEgresos && cloudEgresos.length > 0) setEgresos(cloudEgresos);
+      } catch (err) {
+        console.warn('Sync fallback local:', err);
+      }
+    }
+    syncCloud();
+  }, []);
 
   const [preselectedSocioId, setPreselectedSocioId] = useState(20);
   const [printMode, setPrintMode] = useState('termico');
@@ -109,33 +138,38 @@ export default function App() {
     setActiveTab('cobranzas');
   };
 
-  const handleSaveSocio = (newData) => {
-    const newId = Math.max(...socios.map(s => s.id), 0) + 1;
-    const newSocio = {
-      id: newId,
+  const handleSaveSocio = async (newData) => {
+    const newSocioPayload = {
       nombres: newData.nombres,
       apPaterno: newData.apPaterno,
-      apMaterno: newData.apMaterno,
+      apMaterno: newData.apMaterno || '',
       ci: newData.ci,
-      celular: newData.celular,
+      celular: newData.celular || '',
       fechaIngreso: newData.fechaIngreso,
       estado: "VIG",
       categoria: newData.categoria,
-      observaciones: newData.observaciones || "Nuevo afiliado registrado",
-      acciones: [
-        { id: `10${newId}`, fecha: newData.fechaIngreso, monto: 0.0, estado: "VIG", categoria: newData.categoria }
-      ],
+      observaciones: newData.observaciones || "Nuevo afiliado registrado"
+    };
+
+    // Guardar en Supabase a través de Railway
+    const createdRemote = await createSocioAPI(newSocioPayload);
+    const finalSocio = createdRemote || {
+      id: Math.max(...socios.map(s => s.id), 0) + 1,
+      ...newSocioPayload,
+      acciones: [{ id: `10${Date.now()}`, fecha: newSocioPayload.fechaIngreso, monto: 0.0, estado: "VIG", categoria: newSocioPayload.categoria }],
       obligaciones: []
     };
 
     if (newData.cuotaSostenimiento) {
-      newSocio.obligaciones.push({ nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" });
+      finalSocio.obligaciones = finalSocio.obligaciones || [];
+      finalSocio.obligaciones.push({ nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" });
     }
     if (newData.cuotaGPS) {
-      newSocio.obligaciones.push({ nombre: "Mantenimiento GPS", monto: 80.0, periodicidad: "Mensual" });
+      finalSocio.obligaciones = finalSocio.obligaciones || [];
+      finalSocio.obligaciones.push({ nombre: "Mantenimiento GPS", monto: 80.0, periodicidad: "Mensual" });
     }
 
-    setSocios([newSocio, ...socios]);
+    setSocios(prev => [finalSocio, ...prev.filter(s => s.id !== finalSocio.id)]);
   };
 
   if (!currentUser) {
