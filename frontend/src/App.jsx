@@ -36,7 +36,7 @@ import {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => 
-    loadFromStorage(STORAGE_KEYS.USER, { id: 'admin33', nombre: 'Administrador Central', rol: 'admin' })
+    loadFromStorage(STORAGE_KEYS.USER, null)
   );
 
   const [activeTab, setActiveTab] = useState('dashboard');

@@ -4,7 +4,7 @@ const STORAGE_KEYS = {
   DEUDAS: 'siscob_deudas',
   CAJAS: 'siscob_cajas',
   EGRESOS: 'siscob_egresos',
-  USER: 'siscob_current_user',
+  USER: 'siscob_auth_user',
   SETTINGS: 'siscob_settings'
 };
 

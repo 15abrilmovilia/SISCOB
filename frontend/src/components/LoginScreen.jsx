@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { Landmark, Lock, User, ShieldCheck, ArrowRight } from 'lucide-react';
 
 export default function LoginScreen({ onLogin }) {
-  const [usuario, setUsuario] = useState('admin33');
-  const [password, setPassword] = useState('123456');
+  const [usuario, setUsuario] = useState('');
+  const [password, setPassword] = useState('');
   const [rol, setRol] = useState('admin'); // 'admin' | 'cajero'
 
   const handleSubmit = (e) => {
     e.preventDefault();
     onLogin({
-      id: usuario,
-      nombre: rol === 'admin' ? 'Administrador Central' : 'Daniela (Cajera 01)',
+      id: usuario || (rol === 'admin' ? 'admin' : 'cajero'),
+      nombre: rol === 'admin' ? 'Administrador Central' : 'Cajero(a) Autorizado',
       rol: rol
     });
   };
