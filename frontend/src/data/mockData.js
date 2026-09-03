@@ -8,12 +8,14 @@ export const INITIAL_SOCIOS = [
     apMaterno: "VARGAS",
     ci: "4414561",
     celular: "7141199",
+    placa: "2841-XYZ",
+    vehiculo: "Toyota Caldina Blanco",
     fechaIngreso: "2017-02-26",
     estado: "VIG",
-    categoria: "Conductores",
+    categoria: "Propietario",
     observaciones: "Socio activo sin observaciones disciplinarias",
     acciones: [
-      { id: "1120", fecha: "2017-02-26", monto: 0.0, estado: "VIG", categoria: "Conductores" }
+      { id: "1120", fecha: "2017-02-26", monto: 0.0, estado: "VIG", categoria: "Propietario" }
     ],
     obligaciones: [
       { nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" },
@@ -28,6 +30,8 @@ export const INITIAL_SOCIOS = [
     apMaterno: "GARCIA",
     ci: "3013145",
     celular: "75483109",
+    placa: "3104-BTR",
+    vehiculo: "Nissan Sunny Plateado",
     fechaIngreso: "2017-08-30",
     estado: "VIG",
     categoria: "Conductores",
@@ -47,12 +51,14 @@ export const INITIAL_SOCIOS = [
     apMaterno: "GARCIA",
     ci: "4474581",
     celular: "72910482",
+    placa: "1598-KLA",
+    vehiculo: "Toyota Corolla Rojo",
     fechaIngreso: "2017-02-26",
     estado: "VIG",
-    categoria: "Conductores",
+    categoria: "Propietario",
     observaciones: "Socio fundador",
     acciones: [
-      { id: "1004", fecha: "2017-02-26", monto: 0.0, estado: "VIG", categoria: "Conductores" }
+      { id: "1004", fecha: "2017-02-26", monto: 0.0, estado: "VIG", categoria: "Propietario" }
     ],
     obligaciones: [
       { nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" },
@@ -66,6 +72,8 @@ export const INITIAL_SOCIOS = [
     apMaterno: "CANAZA",
     ci: "3829104",
     celular: "76829102",
+    placa: "1940-LKN",
+    vehiculo: "Nissan AD Blanco",
     fechaIngreso: "2015-10-28",
     estado: "VIG",
     categoria: "Conductores",
@@ -85,12 +93,14 @@ export const INITIAL_SOCIOS = [
     apMaterno: "LA FUENTE",
     ci: "6184920",
     celular: "73910284",
+    placa: "4502-PQR",
+    vehiculo: "Suzuki Swift Plomo",
     fechaIngreso: "2018-01-15",
     estado: "VIG",
-    categoria: "Conductores",
+    categoria: "Inquilino",
     observaciones: "Turno intermedio",
     acciones: [
-      { id: "1002", fecha: "2018-01-15", monto: 0.0, estado: "VIG", categoria: "Conductores" }
+      { id: "1002", fecha: "2018-01-15", monto: 0.0, estado: "VIG", categoria: "Inquilino" }
     ],
     obligaciones: [
       { nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" }

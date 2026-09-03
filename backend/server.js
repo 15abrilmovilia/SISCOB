@@ -130,6 +130,66 @@ app.post('/api/socios', async (req, res) => {
   res.status(201).json({ id: Date.now(), ...req.body });
 });
 
+app.put('/api/socios/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nombres, apPaterno, apMaterno, ci, celular, fechaIngreso, estado, categoria, observaciones, vehiculo, placa } = req.body;
+
+  if (pool) {
+    try {
+      const query = `
+        UPDATE socios 
+        SET nombres = COALESCE($1, nombres),
+            ap_paterno = COALESCE($2, ap_paterno),
+            ap_materno = COALESCE($3, ap_materno),
+            ci = COALESCE($4, ci),
+            celular = COALESCE($5, celular),
+            fecha_ingreso = COALESCE($6, fecha_ingreso),
+            estado = COALESCE($7, estado),
+            categoria = COALESCE($8, categoria),
+            observaciones = COALESCE($9, observaciones)
+        WHERE id = $10
+        RETURNING *
+      `;
+      const values = [
+        nombres,
+        apPaterno,
+        apMaterno,
+        ci,
+        celular,
+        fechaIngreso,
+        estado,
+        categoria,
+        observaciones,
+        id
+      ];
+      const { rows } = await pool.query(query, values);
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Socio no encontrado' });
+      }
+      const s = rows[0];
+      return res.json({
+        id: s.id,
+        nombres: s.nombres,
+        apPaterno: s.ap_paterno,
+        apMaterno: s.ap_materno,
+        ci: s.ci,
+        celular: s.celular,
+        fechaIngreso: s.fecha_ingreso ? s.fecha_ingreso.toISOString().slice(0, 10) : '',
+        estado: s.estado,
+        categoria: s.categoria,
+        observaciones: s.observaciones,
+        vehiculo,
+        placa
+      });
+    } catch (err) {
+      console.error('DB Error al actualizar socio:', err);
+      return res.status(500).json({ error: 'Error al actualizar socio en base de datos.', message: err.message });
+    }
+  }
+
+  res.json({ id: parseInt(id), ...req.body });
+});
+
 app.delete('/api/socios/:id', async (req, res) => {
   if (pool) {
     try {

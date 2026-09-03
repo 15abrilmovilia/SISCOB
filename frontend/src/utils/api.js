@@ -27,6 +27,21 @@ export async function createSocioAPI(socioData) {
   }
 }
 
+export async function updateSocioAPI(id, socioData) {
+  try {
+    const res = await fetch(`${API_BASE}/api/socios/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(socioData)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[SISCOB API] Error al actualizar socio en Supabase:', err.message);
+    return null;
+  }
+}
+
 export async function deleteSocioAPI(id) {
   try {
     const res = await fetch(`${API_BASE}/api/socios/${id}`, {

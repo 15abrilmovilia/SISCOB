@@ -37,6 +37,7 @@ import {
 import { 
   getSociosAPI, 
   createSocioAPI, 
+  updateSocioAPI,
   getCajasAPI, 
   getDeudasAPI, 
   getEgresosAPI 
@@ -139,12 +140,15 @@ export default function App() {
   };
 
   const handleSaveSocio = async (newData) => {
+    const assignedId = newData.customId ? parseInt(newData.customId) : (Math.max(...socios.map(s => s.id), 0) + 1);
     const newSocioPayload = {
       nombres: newData.nombres,
       apPaterno: newData.apPaterno,
       apMaterno: newData.apMaterno || '',
       ci: newData.ci,
       celular: newData.celular || '',
+      placa: newData.placa || '',
+      vehiculo: newData.vehiculo || '',
       fechaIngreso: newData.fechaIngreso,
       estado: "VIG",
       categoria: newData.categoria,
@@ -153,23 +157,31 @@ export default function App() {
 
     // Guardar en Supabase a través de Railway
     const createdRemote = await createSocioAPI(newSocioPayload);
-    const finalSocio = createdRemote || {
-      id: Math.max(...socios.map(s => s.id), 0) + 1,
+    const finalSocio = {
+      id: createdRemote?.id || assignedId,
       ...newSocioPayload,
-      acciones: [{ id: `10${Date.now()}`, fecha: newSocioPayload.fechaIngreso, monto: 0.0, estado: "VIG", categoria: newSocioPayload.categoria }],
+      ...(createdRemote || {}),
+      acciones: [{ id: `10${assignedId}`, fecha: newSocioPayload.fechaIngreso, monto: 0.0, estado: "VIG", categoria: newSocioPayload.categoria }],
       obligaciones: []
     };
 
     if (newData.cuotaSostenimiento) {
-      finalSocio.obligaciones = finalSocio.obligaciones || [];
       finalSocio.obligaciones.push({ nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" });
     }
     if (newData.cuotaGPS) {
-      finalSocio.obligaciones = finalSocio.obligaciones || [];
       finalSocio.obligaciones.push({ nombre: "Mantenimiento GPS", monto: 80.0, periodicidad: "Mensual" });
     }
 
     setSocios(prev => [finalSocio, ...prev.filter(s => s.id !== finalSocio.id)]);
+  };
+
+  const handleUpdateSocio = async (updatedSocio) => {
+    setSocios(prev => prev.map(s => s.id === updatedSocio.id ? updatedSocio : s));
+    try {
+      await updateSocioAPI(updatedSocio.id, updatedSocio);
+    } catch (err) {
+      console.warn('Error al actualizar socio remotamente:', err);
+    }
   };
 
   if (!currentUser) {
@@ -218,10 +230,17 @@ export default function App() {
               setSocios={setSocios} 
               onGoToCobranza={handleGoToCobranza}
               deudas={deudas}
+              setDeudas={setDeudas}
+              onOpenNewSocioModal={() => setIsNewSocioModalOpen(true)}
+              onUpdateSocio={handleUpdateSocio}
             />
           )}
           {activeTab === 'cuotas' && (
-            <CuotasPage socios={socios} />
+            <CuotasPage 
+              socios={socios} 
+              deudas={deudas}
+              setDeudas={setDeudas}
+            />
           )}
           {activeTab === 'cobranzas' && (
             <CobranzasPage 

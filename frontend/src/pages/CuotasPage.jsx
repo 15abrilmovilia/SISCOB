@@ -1,23 +1,58 @@
-import React, { useState } from 'react';
-import { Sliders, Plus, Users, ArrowRightLeft, CheckSquare, Square, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Sliders, 
+  Plus, 
+  Users, 
+  ArrowRightLeft, 
+  CheckSquare, 
+  Square, 
+  AlertCircle, 
+  Sparkles,
+  ShieldAlert,
+  CheckCircle2,
+  DollarSign
+} from 'lucide-react';
+import { createDeudaAPI } from '../utils/api';
+import { loadFromStorage, saveToStorage } from '../utils/storage';
+import AsignarCuotaModal from '../components/AsignarCuotaModal';
 
-export default function CuotasPage({ socios }) {
+const INITIAL_CONCEPTOS = [
+  { id: 'c1', nombre: 'SOSTENIMIENTO MENSUAL RADIO', tipo: 'Mensualidad', monto: 400.0, periodicidad: 'Mensual', sociosAfectados: 180 },
+  { id: 'c2', nombre: 'MANTENIMIENTO GPS TRIMESTRAL', tipo: 'Servicio', monto: 80.0, periodicidad: 'Mensual', sociosAfectados: 165 },
+  { id: 'c3', nombre: 'FALTA A ASAMBLEA GENERAL', tipo: 'Multa', monto: 100.0, periodicidad: 'Variable', sociosAfectados: 18 },
+  { id: 'c4', nombre: 'RIFA ANIVERSARIO 15 DE ABRIL', tipo: 'Extraordinaria', monto: 20.0, periodicidad: 'Única', sociosAfectados: 195 },
+  { id: 'c5', nombre: 'APORTE PRO-SEDE CENTRAL', tipo: 'Aporte', monto: 50.0, periodicidad: 'Mensual', sociosAfectados: 180 }
+];
+
+export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isIndividualModalOpen, setIsIndividualModalOpen] = useState(false);
   
-  // Conceptos vigentes
-  const [conceptos, setConceptos] = useState([
-    { id: 'c1', nombre: 'Sostenimiento Mensual Radio', tipo: 'Mensualidad', monto: 400.0, periodicidad: 'Mensual', sociosAfectados: 180 },
-    { id: 'c2', nombre: 'Mantenimiento GPS Trimestral', tipo: 'Servicio', monto: 80.0, periodicidad: 'Mensual', sociosAfectados: 165 },
-    { id: 'c3', nombre: 'Falta a Asamblea General', tipo: 'Multa', monto: 100.0, periodicidad: 'Variable', sociosAfectados: 18 },
-    { id: 'c4', nombre: 'Rifa Aniversario 15 de Abril', tipo: 'Extraordinaria', monto: 20.0, periodicidad: 'Única', sociosAfectados: 195 },
-    { id: 'c5', nombre: 'Aporte Pro-Sede Central', tipo: 'Aporte', monto: 50.0, periodicidad: 'Mensual', sociosAfectados: 180 }
-  ]);
+  // Conceptos vigentes con persistencia
+  const [conceptos, setConceptos] = useState(() => 
+    loadFromStorage('siscob_conceptos', INITIAL_CONCEPTOS)
+  );
+
+  useEffect(() => {
+    saveToStorage('siscob_conceptos', conceptos);
+  }, [conceptos]);
 
   // Double list selector state for modal
-  const [exentos, setExentos] = useState(socios.slice(3));
-  const [afectados, setAfectados] = useState(socios.slice(0, 3));
+  const [exentos, setExentos] = useState([]);
+  const [afectados, setAfectados] = useState([]);
   const [selectedExentos, setSelectedExentos] = useState([]);
   const [selectedAfectados, setSelectedAfectados] = useState([]);
+
+  // Inicializar selector doble al abrir modal o cargar socios
+  useEffect(() => {
+    if (socios.length > 0) {
+      // Por defecto, todos los socios inician en afectados
+      setAfectados(socios);
+      setExentos([]);
+      setSelectedExentos([]);
+      setSelectedAfectados([]);
+    }
+  }, [socios, isModalOpen]);
 
   // Form data for new quota
   const [nuevoConcepto, setNuevoConcepto] = useState({
@@ -29,6 +64,23 @@ export default function CuotasPage({ socios }) {
     cantidadCuotas: 1,
     obligatorio: true
   });
+
+  // Métricas calculadas en tiempo real de deudas reales
+  const kpis = useMemo(() => {
+    const pendientes = deudas.filter(d => !d.pagado);
+    const totalMonto = pendientes.reduce((acc, d) => acc + (parseFloat(d.monto) || 0), 0);
+    const multas = pendientes.filter(d => 
+      (d.descripcion && d.descripcion.toUpperCase().includes('MULTA')) || d.conceptoId === 8
+    );
+    const totalMultasMonto = multas.reduce((acc, d) => acc + (parseFloat(d.monto) || 0), 0);
+
+    return {
+      totalPendientes: pendientes.length,
+      totalMonto,
+      totalMultas: multas.length,
+      totalMultasMonto
+    };
+  }, [deudas]);
 
   const moveToAfectados = () => {
     const toMove = exentos.filter(s => selectedExentos.includes(s.id));
@@ -56,68 +108,152 @@ export default function CuotasPage({ socios }) {
     setSelectedAfectados([]);
   };
 
-  const handleCrearCargoMasivo = (e) => {
+  // Filtrar rápido por categoría en el selector
+  const selectOnlyCategory = (cat) => {
+    const catSocios = socios.filter(s => s.categoria === cat);
+    const otherSocios = socios.filter(s => s.categoria !== cat);
+    setAfectados(catSocios);
+    setExentos(otherSocios);
+    setSelectedExentos([]);
+    setSelectedAfectados([]);
+  };
+
+  // CREACIÓN Y APLICACIÓN MASIVA DE CARGOS A DEUDAS DE SOCIOS
+  const handleCrearCargoMasivo = async (e) => {
     e.preventDefault();
     if (!nuevoConcepto.nombre || !nuevoConcepto.monto) {
       alert('Complete el nombre y el monto del concepto.');
       return;
     }
 
-    const created = {
-      id: `c${conceptos.length + 1}`,
-      nombre: nuevoConcepto.nombre.toUpperCase(),
+    if (afectados.length === 0) {
+      alert('Debe haber al menos un socio en la lista de Afectados para aplicar el cargo.');
+      return;
+    }
+
+    const montoNum = parseFloat(nuevoConcepto.monto);
+    if (isNaN(montoNum) || montoNum <= 0) {
+      alert('Ingrese un monto válido mayor a 0.');
+      return;
+    }
+
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    const nombreConcepto = nuevoConcepto.nombre.trim().toUpperCase();
+
+    // 1. Guardar concepto en el catálogo de conceptos
+    const createdConcepto = {
+      id: `c${Date.now()}`,
+      nombre: nombreConcepto,
       tipo: nuevoConcepto.tipo,
-      monto: parseFloat(nuevoConcepto.monto),
+      monto: montoNum,
       periodicidad: nuevoConcepto.periodicidad,
       sociosAfectados: afectados.length
     };
+    setConceptos([createdConcepto, ...conceptos]);
 
-    setConceptos([created, ...conceptos]);
+    // 2. Generar las DEUDAS reales para cada socio afectado
+    const nuevasDeudas = afectados.map((s, idx) => ({
+      id: `d-cuota-${Date.now()}-${s.id}-${idx}`,
+      socioId: s.id,
+      conceptoId: nuevoConcepto.tipo === 'Multa' ? 8 : 1,
+      descripcion: nombreConcepto,
+      periodo: nuevoConcepto.periodicidad || 'Actual',
+      monto: montoNum,
+      pagado: false,
+      fecha: fechaHoy,
+      moneda: nuevoConcepto.moneda === 'Dolares' ? '$us' : 'Bs',
+      cantidad: 1
+    }));
+
+    // 3. Sincronizar en segundo plano con el backend
+    nuevasDeudas.forEach(d => {
+      createDeudaAPI({
+        socioId: d.socioId,
+        conceptoId: d.conceptoId,
+        descripcion: d.descripcion,
+        periodo: d.periodo,
+        monto: d.monto,
+        fechaVencimiento: d.fecha
+      });
+    });
+
+    // 4. Actualizar estado global de deudas
+    if (setDeudas) {
+      setDeudas(prev => [...nuevasDeudas, ...prev]);
+    }
+
     setIsModalOpen(false);
-    alert(`Cargo masivo "${created.nombre}" asignado a ${afectados.length} socios.`);
+    setNuevoConcepto({
+      nombre: '',
+      tipo: 'Cobro',
+      periodicidad: 'Mes',
+      moneda: 'Bolivianos',
+      monto: '',
+      cantidadCuotas: 1,
+      obligatorio: true
+    });
+
+    alert(`¡Éxito! Se ha registrado el cargo "${createdConcepto.nombre}" por Bs ${montoNum.toFixed(2)} asignado a los ${afectados.length} socios seleccionados. Ya figura en sus cuentas y Kardex.`);
   };
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
       {/* Top Header */}
-      <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
-          <h1 className="text-lg font-extrabold text-slate-900 flex items-center space-x-2">
+      <div className="flex flex-wrap justify-between items-center bg-white p-5 rounded-3xl border border-slate-200 shadow-xs gap-3">
+        <div className="space-y-0.5">
+          <h1 className="text-lg font-black text-slate-900 flex items-center space-x-2">
             <Sliders className="w-5 h-5 text-red-700" />
             <span>Configuración de Cuotas, Frecuencias y Multas</span>
           </h1>
-          <p className="text-xs text-slate-500">Gestión de cargos periódicos y asignación masiva con selector doble</p>
+          <p className="text-xs text-slate-500">
+            Gestión de cargos periódicos, multas disciplinarias y asignación directa o masiva a socios
+          </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nuevo Cargo Masivo</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsIndividualModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3.5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer border border-slate-200"
+          >
+            <ShieldAlert className="w-4 h-4 text-amber-700" />
+            <span>Multar / Cargar a 1 Socio</span>
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nuevo Cargo Masivo</span>
+          </button>
+        </div>
       </div>
 
-      {/* KPI Cards (Exact Stitch Cuotas Screen) */}
+      {/* KPI Cards Dinámicas */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        {/* Cargos Activos */}
         <div className="md:col-span-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex justify-between items-start">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cargos Activos</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cargos Activos en Cartera</span>
             <span className="p-2 bg-blue-50 text-blue-700 rounded-xl"><Users className="w-4 h-4" /></span>
           </div>
           <div className="mt-2">
-            <div className="text-3xl font-extrabold text-slate-900 font-mono">1,245</div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Bs 45,200.00 pendientes por cobrar</p>
+            <div className="text-3xl font-black text-slate-900 font-mono">{kpis.totalPendientes}</div>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Bs {kpis.totalMonto.toLocaleString('es-BO', { minimumFractionDigits: 2 })} pendientes por cobrar
+            </p>
           </div>
         </div>
 
+        {/* Multas Recientes */}
         <div className="md:col-span-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex justify-between items-start">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Multas Recientes</span>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Multas Registradas</span>
             <span className="p-2 bg-rose-50 text-rose-700 rounded-xl"><AlertCircle className="w-4 h-4" /></span>
           </div>
           <div className="mt-2">
-            <div className="text-3xl font-extrabold text-slate-900 font-mono">18</div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Por inasistencia a la última asamblea</p>
+            <div className="text-3xl font-black text-rose-700 font-mono">{kpis.totalMultas}</div>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Bs {kpis.totalMultasMonto.toLocaleString('es-BO', { minimumFractionDigits: 2 })} en sanciones por cobrar
+            </p>
           </div>
         </div>
 
@@ -128,13 +264,15 @@ export default function CuotasPage({ socios }) {
         >
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-red-200 block mb-1">
-              APLICACIÓN RÁPIDA
+              APLICACIÓN INMEDIATA
             </span>
             <h3 className="text-lg font-extrabold leading-snug">Asignar Cargo Masivo a Socios</h3>
-            <p className="text-xs text-red-100 mt-1">Aplica cuotas o multas a toda la categoría o padrón con selector doble.</p>
+            <p className="text-xs text-red-100 mt-1">
+              Aplica cuotas o multas a toda la categoría o padrón con selector doble interactivo.
+            </p>
           </div>
           <div className="mt-4 pt-3 border-t border-red-600/50 flex justify-between items-center text-xs font-bold text-white group-hover:translate-x-1 transition-transform">
-            <span>Iniciar Asignación</span>
+            <span>Iniciar Asignación Masiva</span>
             <span>→</span>
           </div>
         </div>
@@ -150,7 +288,7 @@ export default function CuotasPage({ socios }) {
             <p className="text-xs text-slate-500">Configuración activa de aportes, frecuencias y penalizaciones</p>
           </div>
           <span className="text-xs font-bold text-red-700 bg-red-50 px-2.5 py-1 rounded-full border border-red-200">
-            {conceptos.length} Conceptos Activos
+            {conceptos.length} Conceptos Registrados
           </span>
         </div>
 
@@ -162,7 +300,7 @@ export default function CuotasPage({ socios }) {
                 <th className="p-3">Tipo</th>
                 <th className="p-3">Periodicidad</th>
                 <th className="p-3 text-right">Monto (Bs)</th>
-                <th className="p-3 text-center">Socios Afectados</th>
+                <th className="p-3 text-center">Última Aplicación</th>
                 <th className="p-3 text-center">Estado</th>
               </tr>
             </thead>
@@ -171,7 +309,11 @@ export default function CuotasPage({ socios }) {
                 <tr key={c.id} className="hover:bg-slate-50 transition">
                   <td className="p-3 font-bold text-slate-900 uppercase">{c.nombre}</td>
                   <td className="p-3">
-                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-semibold border border-slate-200">
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                      c.tipo === 'Multa'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                    }`}>
                       {c.tipo}
                     </span>
                   </td>
@@ -195,7 +337,10 @@ export default function CuotasPage({ socios }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 text-xs">
             <div className="bg-slate-900 text-white px-5 py-3.5 flex justify-between items-center">
-              <h3 className="font-bold text-sm">Configuración de Cargo Masivo (Selector Doble)</h3>
+              <div>
+                <h3 className="font-black text-sm text-white">Configuración y Aplicación de Cargo Masivo</h3>
+                <p className="text-[10px] text-slate-400">Genera deudas en las cuentas de los socios seleccionados</p>
+              </div>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white text-base">✕</button>
             </div>
 
@@ -206,10 +351,10 @@ export default function CuotasPage({ socios }) {
                   <input
                     type="text"
                     required
-                    placeholder="Ej. CUOTA FRECUENCIA OCTUBRE o MULTA REUNIÓN"
+                    placeholder="Ej. CUOTA FRECUENCIA OCTUBRE o MULTA REUNIÓN GENERAL"
                     value={nuevoConcepto.nombre}
                     onChange={(e) => setNuevoConcepto({ ...nuevoConcepto, nombre: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg uppercase"
+                    className="w-full p-2 border border-slate-300 rounded-lg uppercase font-bold focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -217,7 +362,7 @@ export default function CuotasPage({ socios }) {
                   <select
                     value={nuevoConcepto.tipo}
                     onChange={(e) => setNuevoConcepto({ ...nuevoConcepto, tipo: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg"
+                    className="w-full p-2 border border-slate-300 rounded-lg font-semibold focus:ring-2 focus:ring-red-500 focus:outline-none"
                   >
                     <option value="Cobro">Cobro Regular</option>
                     <option value="Amortizacion">Amortización</option>
@@ -231,7 +376,7 @@ export default function CuotasPage({ socios }) {
                   <select
                     value={nuevoConcepto.periodicidad}
                     onChange={(e) => setNuevoConcepto({ ...nuevoConcepto, periodicidad: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg"
+                    className="w-full p-2 border border-slate-300 rounded-lg font-semibold focus:ring-2 focus:ring-red-500 focus:outline-none"
                   >
                     <option value="Mes">Mensual</option>
                     <option value="Semana">Semanal</option>
@@ -249,7 +394,7 @@ export default function CuotasPage({ socios }) {
                     placeholder="100.00"
                     value={nuevoConcepto.monto}
                     onChange={(e) => setNuevoConcepto({ ...nuevoConcepto, monto: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold"
+                    className="w-full p-2 border border-slate-300 rounded-lg font-mono font-black text-sm text-slate-900 focus:ring-2 focus:ring-red-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -265,7 +410,40 @@ export default function CuotasPage({ socios }) {
                 </div>
               </div>
 
-              {/* Double List Selector (Exact Match to Frame 60s in Quipus) */}
+              {/* Selector Rápido por Categoría */}
+              <div className="flex items-center space-x-2 pt-1">
+                <span className="text-[11px] font-bold text-slate-500">Selección Rápida:</span>
+                <button
+                  type="button"
+                  onClick={moveAllToAfectados}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold"
+                >
+                  Todos ({socios.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectOnlyCategory('Propietario')}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold"
+                >
+                  Solo Propietarios
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectOnlyCategory('Conductores')}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold"
+                >
+                  Solo Conductores
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectOnlyCategory('Inquilino')}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold"
+                >
+                  Solo Inquilinos
+                </button>
+              </div>
+
+              {/* Double List Selector */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-extrabold uppercase text-slate-800">
@@ -291,10 +469,10 @@ export default function CuotasPage({ socios }) {
                             : [...selectedExentos, s.id]
                         )}
                         className={`p-1.5 rounded text-[11px] cursor-pointer transition truncate ${
-                          selectedExentos.includes(s.id) ? 'bg-blue-600 text-white font-bold' : 'hover:bg-slate-100'
+                          selectedExentos.includes(s.id) ? 'bg-slate-700 text-white font-bold' : 'hover:bg-slate-100'
                         }`}
                       >
-                        {s.id} - {s.nombres} {s.apPaterno}
+                        #{s.id} - {s.nombres} {s.apPaterno}
                       </div>
                     ))}
                   </div>
@@ -352,33 +530,45 @@ export default function CuotasPage({ socios }) {
                           selectedAfectados.includes(s.id) ? 'bg-red-700 text-white font-bold' : 'hover:bg-slate-100'
                         }`}
                       >
-                        {s.id} - {s.nombres} {s.apPaterno}
+                        #{s.id} - {s.nombres} {s.apPaterno}
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
+              <div className="p-2.5 bg-red-50 rounded-xl border border-red-200 text-red-900 text-[11px]">
+                <strong>Aviso Contable:</strong> Al hacer clic en "Guardar y Aplicar Cargo", se generará automáticamente una cuenta por cobrar (deuda) de <strong>Bs {nuevoConcepto.monto || '0.00'}</strong> a cada uno de los <strong>{afectados.length}</strong> socios seleccionados.
+              </div>
+
               <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-200 text-slate-700 rounded-xl font-bold"
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={afectados.length === 0}
-                  className="px-5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl font-extrabold shadow-sm"
+                  className="px-5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl font-extrabold shadow-sm transition cursor-pointer disabled:opacity-50"
                 >
-                  Guardar y Aplicar Cargo
+                  Guardar y Aplicar Cargo a {afectados.length} Socios
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Modal para multar / cargar a un socio individual */}
+      <AsignarCuotaModal
+        isOpen={isIndividualModalOpen}
+        onClose={() => setIsIndividualModalOpen(false)}
+        socios={socios}
+        setDeudas={setDeudas}
+      />
     </div>
   );
 }
