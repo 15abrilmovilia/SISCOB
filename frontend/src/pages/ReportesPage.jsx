@@ -57,22 +57,165 @@ const RAW_DEUDAS_PENDIENTES = [
   { interno: 20, nombre: 'REMBERTO TORRICO', cat: 'Conductores', caja: 'c1', moneda: 'Bs', retrasado: 144.0, inasistencia: 0.0, gpsJulio: 36.0, pandemia: 610.0, interes: 0.0, prestamo: 0.0, colaboracion: 0.0, promanten: 0.0, guardaBarro: 0.0, llanta: 0.0, gpsMarzo: 0.0 }
 ];
 
-export default function ReportesPage({ socios = [], deudas = [], cajas = [], egresos = [] }) {
+export default function ReportesPage({ 
+  socios = [], 
+  deudas = [], 
+  cajas = [], 
+  egresos = [], 
+  prestamos = [] 
+}) {
   const [reportTab, setReportTab] = useState('recaudados'); // 'recaudados' | 'deudas'
-  const [dataSource, setDataSource] = useState('historico'); // 'historico' | 'real'
+  const [dataSource, setDataSource] = useState('real'); // 'real' | 'historico'
+  const [soloConDeuda, setSoloConDeuda] = useState(false);
 
-  // Shared Filter States
-  const [fechaDesde, setFechaDesde] = useState('2026-07-20');
-  const [fechaHasta, setFechaHasta] = useState('2026-08-01');
+  // Shared Filter States (amplio por defecto para cubrir operaciones reales del año 2026)
+  const [fechaDesde, setFechaDesde] = useState('2026-01-01');
+  const [fechaHasta, setFechaHasta] = useState(new Date().toISOString().split('T')[0]);
   const [selectedCategoria, setSelectedCategoria] = useState('TODOS');
   const [selectedMoneda, setSelectedMoneda] = useState('TODAS');
   const [selectedCaja, setSelectedCaja] = useState('TODAS');
   const [selectedCajero, setSelectedCajero] = useState('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. Filtrado para Ingresos Recaudados
+  // 1. CONSTRUCCIÓN DINÁMICA DE LA MATRIZ REAL DE INGRESOS RECAUDADOS
+  const realIngresos = useMemo(() => {
+    return socios.map(s => {
+      const nombreCompleto = `${s.nombres || ''} ${s.apPaterno || ''} ${s.apMaterno || ''}`.trim();
+      const paidDeudas = deudas.filter(d => {
+        if (d.socioId !== s.id || !d.pagado) return false;
+        if (fechaDesde && d.fecha && d.fecha < fechaDesde) return false;
+        if (fechaHasta && d.fecha && d.fecha > fechaHasta) return false;
+        if (selectedMoneda !== 'TODAS' && d.moneda && d.moneda !== selectedMoneda) return false;
+        if (selectedCaja !== 'TODAS' && d.cajaId && d.cajaId !== selectedCaja) return false;
+        return true;
+      });
+
+      const sumDesc = (patterns) => {
+        return paidDeudas
+          .filter(d => {
+            const desc = (d.descripcion || '').toUpperCase();
+            return patterns.some(p => desc.includes(p));
+          })
+          .reduce((sum, d) => sum + (parseFloat(d.monto) || 0), 0);
+      };
+
+      const ahorro = sumDesc(['AHORRO']);
+      const jefeLinea = sumDesc(['JEFE', 'LINEA', 'LÍNEA']);
+      const gpsMarzo = sumDesc(['GPS MARZO', 'GPS ANT']);
+      const gpsJulio = Math.max(0, sumDesc(['GPS']) - gpsMarzo);
+      const minPunta = sumDesc(['PUNTA', 'MINUTO']);
+      const proMarzo = sumDesc(['PRO MARZO']);
+      const sostenimiento = sumDesc(['SOSTENIMIENTO', 'MENSUALIDAD', 'CUOTA MENSUAL']);
+      const pandemia = sumDesc(['PANDEMIA']);
+      const retrasado = sumDesc(['RETRAS', 'MORA', 'VENCID']);
+      const prestamo = sumDesc(['PRÉSTAMO', 'PRESTAMO', 'AMORTIZ']);
+      const interes = sumDesc(['INTERÉS', 'INTERES']);
+      const proSede = sumDesc(['SEDE', 'PRO-SEDE']);
+      const proGps2 = sumDesc(['GPS 2', 'GPS2']);
+      
+      const subtotalConceptos = ahorro + jefeLinea + gpsJulio + gpsMarzo + minPunta + proMarzo + sostenimiento + pandemia + retrasado + prestamo + interes + proSede + proGps2;
+      const totalPagadoSocio = paidDeudas.reduce((sum, d) => sum + (parseFloat(d.monto) || 0), 0);
+      const colaboracion = Math.max(0, totalPagadoSocio - subtotalConceptos);
+
+      return {
+        interno: s.id,
+        nombre: nombreCompleto,
+        cat: s.categoria || 'Conductores',
+        caja: 'c1',
+        moneda: 'Bs',
+        cajero: 'ADMIN',
+        ahorro,
+        jefeLinea,
+        gpsJulio,
+        gpsMarzo,
+        minPunta,
+        proMarzo,
+        sostenimiento,
+        pandemia,
+        retrasado,
+        colaboracion,
+        prestamo,
+        interes,
+        proSede,
+        proGps2,
+        total: totalPagadoSocio
+      };
+    });
+  }, [socios, deudas, fechaDesde, fechaHasta, selectedMoneda, selectedCaja]);
+
+  // 2. CONSTRUCCIÓN DINÁMICA DE LA MATRIZ REAL DE DEUDAS PENDIENTES
+  const realDeudas = useMemo(() => {
+    return socios.map(s => {
+      const nombreCompleto = `${s.nombres || ''} ${s.apPaterno || ''} ${s.apMaterno || ''}`.trim();
+      const pendDeudas = deudas.filter(d => {
+        if (d.socioId !== s.id || d.pagado) return false;
+        if (fechaHasta && d.fecha && d.fecha > fechaHasta) return false;
+        if (selectedMoneda !== 'TODAS' && d.moneda && d.moneda !== selectedMoneda) return false;
+        if (selectedCaja !== 'TODAS' && d.cajaId && d.cajaId !== selectedCaja) return false;
+        return true;
+      });
+
+      const sumDesc = (patterns) => {
+        return pendDeudas
+          .filter(d => {
+            const desc = (d.descripcion || '').toUpperCase();
+            return patterns.some(p => desc.includes(p));
+          })
+          .reduce((sum, d) => sum + (parseFloat(d.monto) || 0), 0);
+      };
+
+      const retrasado = sumDesc(['SOSTENIMIENTO', 'RETRAS', 'MENSUAL', 'CUOTA']);
+      const inasistencia = sumDesc(['INASISTENCIA', 'REUNION', 'REUNIÓN', 'ASAMBLEA', 'MULTA', 'FALTA']) +
+        pendDeudas.filter(d => d.conceptoId === 8 && !['MULTA', 'FALTA', 'INASISTENCIA', 'REUNION'].some(w => (d.descripcion || '').toUpperCase().includes(w))).reduce((sum, d) => sum + (parseFloat(d.monto) || 0), 0);
+      const gpsJulio = sumDesc(['GPS']);
+      const pandemia = sumDesc(['PANDEMIA']);
+      const interes = sumDesc(['INTERÉS', 'INTERES']);
+      
+      let prestamoMonto = sumDesc(['PRÉSTAMO', 'PRESTAMO', 'AMORTIZ']);
+      if (prestamoMonto === 0 && prestamos && prestamos.length > 0) {
+        const prestamosSocio = prestamos.filter(p => (p.socioId === s.id || p.id === s.id) && p.estado !== 'PAGADO');
+        prestamoMonto = prestamosSocio.reduce((sum, p) => sum + (parseFloat(p.saldo) || 0), 0);
+      }
+
+      const promanten = sumDesc(['PROMANTEN', 'MANTEN']);
+      const guardaBarro = sumDesc(['GUARDA', 'BARRO', 'REPUESTO']);
+      const llanta = sumDesc(['LLANTA', 'NEUMATIC']);
+      const gpsMarzo = sumDesc(['GPS MARZO', 'GPS ANT']);
+
+      const subtotalClasificado = retrasado + inasistencia + gpsJulio + pandemia + interes + prestamoMonto + promanten + guardaBarro + llanta + gpsMarzo;
+      const totalDeudaSocio = pendDeudas.reduce((sum, d) => sum + (parseFloat(d.monto) || 0), 0) + 
+        (prestamoMonto > 0 && pendDeudas.every(d => !['PRÉSTAMO', 'PRESTAMO'].some(w => (d.descripcion || '').toUpperCase().includes(w))) ? prestamoMonto : 0);
+      const colaboracion = Math.max(0, totalDeudaSocio - subtotalClasificado);
+
+      return {
+        interno: s.id,
+        nombre: nombreCompleto,
+        cat: s.categoria || 'Conductores',
+        caja: 'c1',
+        moneda: 'Bs',
+        retrasado,
+        inasistencia,
+        gpsJulio,
+        pandemia,
+        interes,
+        prestamo: prestamoMonto,
+        colaboracion,
+        promanten,
+        guardaBarro,
+        llanta,
+        gpsMarzo,
+        total: totalDeudaSocio
+      };
+    });
+  }, [socios, deudas, prestamos, fechaHasta, selectedMoneda, selectedCaja]);
+
+  // Selección de fuente de datos activa
+  const activeIngresosList = dataSource === 'real' ? realIngresos : RAW_INGRESOS;
+  const activeDeudasList = dataSource === 'real' ? realDeudas : RAW_DEUDAS_PENDIENTES;
+
+  // 3. Filtrado para Ingresos Recaudados
   const filteredIngresos = useMemo(() => {
-    return RAW_INGRESOS.filter(item => {
+    return activeIngresosList.filter(item => {
       const matchCat = selectedCategoria === 'TODOS' || item.cat === selectedCategoria;
       const matchMoneda = selectedMoneda === 'TODAS' || item.moneda === selectedMoneda;
       const matchCaja = selectedCaja === 'TODAS' || item.caja === selectedCaja;
@@ -81,7 +224,7 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
         `${item.interno} ${item.nombre}`.toLowerCase().includes(searchTerm.toLowerCase());
       return matchCat && matchMoneda && matchCaja && matchCajero && matchSearch;
     });
-  }, [selectedCategoria, selectedMoneda, selectedCaja, selectedCajero, searchTerm]);
+  }, [activeIngresosList, selectedCategoria, selectedMoneda, selectedCaja, selectedCajero, searchTerm]);
 
   // Totales Ingresos
   const totalsIngresos = useMemo(() => {
@@ -105,17 +248,18 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
   }, [filteredIngresos]);
   const grandTotalIngresos = Object.values(totalsIngresos).reduce((a, b) => a + b, 0);
 
-  // 2. Filtrado para Deudas Pendientes
+  // 4. Filtrado para Deudas Pendientes
   const filteredDeudas = useMemo(() => {
-    return RAW_DEUDAS_PENDIENTES.filter(item => {
+    return activeDeudasList.filter(item => {
       const matchCat = selectedCategoria === 'TODOS' || item.cat === selectedCategoria;
       const matchMoneda = selectedMoneda === 'TODAS' || item.moneda === selectedMoneda;
       const matchCaja = selectedCaja === 'TODAS' || item.caja === selectedCaja;
       const matchSearch = searchTerm === '' || 
         `${item.interno} ${item.nombre}`.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchCat && matchMoneda && matchCaja && matchSearch;
+      const matchSoloConDeuda = !soloConDeuda || (item.total && item.total > 0);
+      return matchCat && matchMoneda && matchCaja && matchSearch && matchSoloConDeuda;
     });
-  }, [selectedCategoria, selectedMoneda, selectedCaja, searchTerm]);
+  }, [activeDeudasList, selectedCategoria, selectedMoneda, selectedCaja, searchTerm, soloConDeuda]);
 
   // Totales Deudas
   const totalsDeudas = useMemo(() => {
@@ -136,7 +280,7 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
   }, [filteredDeudas]);
   const grandTotalDeudas = Object.values(totalsDeudas).reduce((a, b) => a + b, 0);
 
-  // 3. EXPORTAR A EXCEL / CSV REAL (Descarga directa)
+  // 5. EXPORTAR A EXCEL / CSV REAL (Descarga directa con datos reales del sistema)
   const handleExportExcel = (tipo) => {
     if (tipo === 'Ingresos') {
       const headers = [
@@ -156,12 +300,12 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
       });
       // Añadir fila de totales
       rows.push([
-        'TOTALES', 'TODOS', totalsIngresos.ahorro, totalsIngresos.jefeLinea, totalsIngresos.gpsJulio,
+        'TOTALES', `(${filteredIngresos.length} Registros)`, totalsIngresos.ahorro, totalsIngresos.jefeLinea, totalsIngresos.gpsJulio,
         totalsIngresos.gpsMarzo, totalsIngresos.minPunta, totalsIngresos.proMarzo, totalsIngresos.sostenimiento,
         totalsIngresos.pandemia, totalsIngresos.retrasado, totalsIngresos.colaboracion, totalsIngresos.prestamo,
         totalsIngresos.interes, totalsIngresos.proSede, totalsIngresos.proGps2, grandTotalIngresos
       ]);
-      downloadCSV(`Matriz_Ingresos_Recaudados_${fechaDesde}_${fechaHasta}`, headers, rows);
+      downloadCSV(`Matriz_Ingresos_${dataSource}_${fechaDesde}_${fechaHasta}`, headers, rows);
     } else {
       const headers = [
         'Interno', 'Nombre Socio', 'Sostenimiento Retrasado', 'Inasistencia', 'GPS Julio', 
@@ -177,11 +321,11 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
         ];
       });
       rows.push([
-        'TOTALES', 'TODOS', totalsDeudas.retrasado, totalsDeudas.inasistencia, totalsDeudas.gpsJulio,
+        'TOTALES', `(${filteredDeudas.length} Registros)`, totalsDeudas.retrasado, totalsDeudas.inasistencia, totalsDeudas.gpsJulio,
         totalsDeudas.pandemia, totalsDeudas.interes, totalsDeudas.prestamo, totalsDeudas.colaboracion,
         totalsDeudas.promanten, totalsDeudas.guardaBarro, totalsDeudas.llanta, totalsDeudas.gpsMarzo, grandTotalDeudas
       ]);
-      downloadCSV(`Matriz_Deudas_Pendientes_${fechaHasta}`, headers, rows);
+      downloadCSV(`Matriz_Deudas_${dataSource}_${fechaHasta}`, headers, rows);
     }
   };
 
@@ -199,55 +343,59 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
 
     if (isIngresos) {
       theadHTML = `
-        <tr style="background: #0f172a; color: #ffffff; font-size: 8.5px; text-transform: uppercase;">
-          <th style="padding: 5px; border: 1px solid #475569;">Int.</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Ahorro</th>
-          <th style="padding: 5px; border: 1px solid #475569;">J.Línea</th>
-          <th style="padding: 5px; border: 1px solid #475569;">GPS Jul</th>
-          <th style="padding: 5px; border: 1px solid #475569;">GPS Mar</th>
-          <th style="padding: 5px; border: 1px solid #475569;">M.Punta</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Pro Mar</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Sostenim.</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Pandemia</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Retraso</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Colabor.</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Préstamo</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Interés</th>
-          <th style="padding: 5px; border: 1px solid #475569;">P.Sede</th>
-          <th style="padding: 5px; border: 1px solid #475569;">P.GPS2</th>
-          <th style="padding: 5px; border: 1px solid #475569; background: #b91c1c;">TOTAL</th>
+        <tr style="background: #0f172a; color: #ffffff; font-size: 8px; text-transform: uppercase;">
+          <th style="padding: 4px; border: 1px solid #475569;">Int.</th>
+          <th style="padding: 4px; border: 1px solid #475569; text-align: left;">Nombre Socio</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Ahorro</th>
+          <th style="padding: 4px; border: 1px solid #475569;">J.Línea</th>
+          <th style="padding: 4px; border: 1px solid #475569;">GPS Jul</th>
+          <th style="padding: 4px; border: 1px solid #475569;">GPS Mar</th>
+          <th style="padding: 4px; border: 1px solid #475569;">M.Punta</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Pro Mar</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Sostenim.</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Pandemia</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Retraso</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Colabor.</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Préstamo</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Interés</th>
+          <th style="padding: 4px; border: 1px solid #475569;">P.Sede</th>
+          <th style="padding: 4px; border: 1px solid #475569;">P.GPS2</th>
+          <th style="padding: 4px; border: 1px solid #475569; background: #b91c1c;">TOTAL</th>
         </tr>
       `;
 
-      tbodyHTML = filteredIngresos.map(r => {
-        const total = r.ahorro + r.jefeLinea + r.gpsJulio + r.gpsMarzo + r.minPunta + 
-                      r.proMarzo + r.sostenimiento + r.pandemia + r.retrasado + 
-                      r.colaboracion + r.prestamo + r.interes + r.proSede + r.proGps2;
-        return `
-          <tr style="border-bottom: 1px solid #cbd5e1; font-family: monospace; font-size: 9.5px;">
-            <td style="padding: 4px; text-align: center; font-weight: bold; background: #f8fafc;">${r.interno}</td>
-            <td style="padding: 4px; text-align: right;">${r.ahorro.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.jefeLinea.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.gpsJulio.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.gpsMarzo.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.minPunta.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.proMarzo.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right; font-weight: bold;">${r.sostenimiento.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.pandemia.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.retrasado.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.colaboracion.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right; color: #1d4ed8; font-weight: bold;">${r.prestamo.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.interes.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.proSede.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.proGps2.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right; font-weight: bold; background: #f1f5f9;">${total.toFixed(1)}</td>
-          </tr>
-        `;
-      }).join('');
+      tbodyHTML = filteredIngresos.length === 0 
+        ? `<tr><td colspan="17" style="padding: 20px; text-align: center; color: #64748b;">No hay registros de recaudación para mostrar con los filtros seleccionados.</td></tr>`
+        : filteredIngresos.map(r => {
+            const total = r.ahorro + r.jefeLinea + r.gpsJulio + r.gpsMarzo + r.minPunta + 
+                          r.proMarzo + r.sostenimiento + r.pandemia + r.retrasado + 
+                          r.colaboracion + r.prestamo + r.interes + r.proSede + r.proGps2;
+            return `
+              <tr style="border-bottom: 1px solid #cbd5e1; font-family: monospace; font-size: 9px;">
+                <td style="padding: 3px; text-align: center; font-weight: bold; background: #f8fafc;">${r.interno}</td>
+                <td style="padding: 3px; text-align: left; font-family: sans-serif; font-size: 8.5px;">${r.nombre}</td>
+                <td style="padding: 3px; text-align: right;">${r.ahorro.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.jefeLinea.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.gpsJulio.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.gpsMarzo.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.minPunta.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.proMarzo.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right; font-weight: bold;">${r.sostenimiento.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.pandemia.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.retrasado.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.colaboracion.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right; color: #1d4ed8; font-weight: bold;">${r.prestamo.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.interes.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.proSede.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.proGps2.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right; font-weight: bold; background: #f1f5f9;">${total.toFixed(1)}</td>
+              </tr>
+            `;
+          }).join('');
 
       tfootHTML = `
-        <tr style="background: #e2e8f0; font-weight: bold; font-family: monospace; font-size: 9.5px; border-top: 2px solid #0f172a;">
-          <td style="padding: 5px; text-align: center;">TOTALES</td>
+        <tr style="background: #e2e8f0; font-weight: bold; font-family: monospace; font-size: 9px; border-top: 2px solid #0f172a;">
+          <td style="padding: 5px; text-align: center;" colspan="2">TOTALES (${filteredIngresos.length})</td>
           <td style="padding: 5px; text-align: right;">${totalsIngresos.ahorro.toFixed(1)}</td>
           <td style="padding: 5px; text-align: right;">${totalsIngresos.jefeLinea.toFixed(1)}</td>
           <td style="padding: 5px; text-align: right;">${totalsIngresos.gpsJulio.toFixed(1)}</td>
@@ -267,48 +415,52 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
       `;
     } else {
       theadHTML = `
-        <tr style="background: #0f172a; color: #ffffff; font-size: 8.5px; text-transform: uppercase;">
-          <th style="padding: 5px; border: 1px solid #475569;">Int.</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Retrasado</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Inasist.</th>
-          <th style="padding: 5px; border: 1px solid #475569;">GPS Jul</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Pandemia</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Interés</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Préstamo</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Colabor.</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Promanten</th>
-          <th style="padding: 5px; border: 1px solid #475569;">GuardaB.</th>
-          <th style="padding: 5px; border: 1px solid #475569;">Llanta</th>
-          <th style="padding: 5px; border: 1px solid #475569;">GPS Mar</th>
-          <th style="padding: 5px; border: 1px solid #475569; background: #b91c1c;">TOTAL DEUDA</th>
+        <tr style="background: #0f172a; color: #ffffff; font-size: 8px; text-transform: uppercase;">
+          <th style="padding: 4px; border: 1px solid #475569;">Int.</th>
+          <th style="padding: 4px; border: 1px solid #475569; text-align: left;">Nombre Socio</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Retrasado</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Inasist.</th>
+          <th style="padding: 4px; border: 1px solid #475569;">GPS Jul</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Pandemia</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Interés</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Préstamo</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Colabor.</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Promanten</th>
+          <th style="padding: 4px; border: 1px solid #475569;">GuardaB.</th>
+          <th style="padding: 4px; border: 1px solid #475569;">Llanta</th>
+          <th style="padding: 4px; border: 1px solid #475569;">GPS Mar</th>
+          <th style="padding: 4px; border: 1px solid #475569; background: #b91c1c;">TOTAL DEUDA</th>
         </tr>
       `;
 
-      tbodyHTML = filteredDeudas.map(r => {
-        const total = r.retrasado + r.inasistencia + r.gpsJulio + r.pandemia + r.interes + 
-                      r.prestamo + r.colaboracion + r.promanten + r.guardaBarro + r.llanta + r.gpsMarzo;
-        return `
-          <tr style="border-bottom: 1px solid #cbd5e1; font-family: monospace; font-size: 9.5px;">
-            <td style="padding: 4px; text-align: center; font-weight: bold; background: #f8fafc;">${r.interno}</td>
-            <td style="padding: 4px; text-align: right;">${r.retrasado.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right; color: #e11d48; font-weight: bold;">${r.inasistencia.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.gpsJulio.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.pandemia.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.interes.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right; color: #1d4ed8; font-weight: bold;">${r.prestamo.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.colaboracion.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.promanten.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.guardaBarro.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.llanta.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right;">${r.gpsMarzo.toFixed(1)}</td>
-            <td style="padding: 4px; text-align: right; font-weight: 900; background: #fee2e2; color: #991b1b;">${total.toFixed(1)}</td>
-          </tr>
-        `;
-      }).join('');
+      tbodyHTML = filteredDeudas.length === 0
+        ? `<tr><td colspan="14" style="padding: 20px; text-align: center; color: #64748b;">No hay deudas pendientes registradas para mostrar con los filtros seleccionados.</td></tr>`
+        : filteredDeudas.map(r => {
+            const total = r.retrasado + r.inasistencia + r.gpsJulio + r.pandemia + r.interes + 
+                          r.prestamo + r.colaboracion + r.promanten + r.guardaBarro + r.llanta + r.gpsMarzo;
+            return `
+              <tr style="border-bottom: 1px solid #cbd5e1; font-family: monospace; font-size: 9px;">
+                <td style="padding: 3px; text-align: center; font-weight: bold; background: #f8fafc;">${r.interno}</td>
+                <td style="padding: 3px; text-align: left; font-family: sans-serif; font-size: 8.5px;">${r.nombre}</td>
+                <td style="padding: 3px; text-align: right;">${r.retrasado.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right; color: #e11d48; font-weight: bold;">${r.inasistencia.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.gpsJulio.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.pandemia.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.interes.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right; color: #1d4ed8; font-weight: bold;">${r.prestamo.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.colaboracion.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.promanten.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.guardaBarro.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.llanta.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right;">${r.gpsMarzo.toFixed(1)}</td>
+                <td style="padding: 3px; text-align: right; font-weight: 900; background: #fee2e2; color: #991b1b;">${total.toFixed(1)}</td>
+              </tr>
+            `;
+          }).join('');
 
       tfootHTML = `
-        <tr style="background: #e2e8f0; font-weight: bold; font-family: monospace; font-size: 9.5px; border-top: 2px solid #0f172a;">
-          <td style="padding: 5px; text-align: center;">TOTALES</td>
+        <tr style="background: #e2e8f0; font-weight: bold; font-family: monospace; font-size: 9px; border-top: 2px solid #0f172a;">
+          <td style="padding: 5px; text-align: center;" colspan="2">TOTALES (${filteredDeudas.length})</td>
           <td style="padding: 5px; text-align: right;">${totalsDeudas.retrasado.toFixed(1)}</td>
           <td style="padding: 5px; text-align: right; color: #e11d48;">${totalsDeudas.inasistencia.toFixed(1)}</td>
           <td style="padding: 5px; text-align: right;">${totalsDeudas.gpsJulio.toFixed(1)}</td>
@@ -375,30 +527,58 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
           </p>
         </div>
 
-        {/* Tab Switcher: Ingresos vs Deudas */}
-        <div className="flex bg-slate-100 p-1 rounded-xl space-x-1 text-xs font-bold">
-          <button
-            onClick={() => setReportTab('recaudados')}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
-              reportTab === 'recaudados' 
-                ? 'bg-red-700 text-white shadow-xs' 
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>Ingresos Recaudados por Socio</span>
-          </button>
-          <button
-            onClick={() => setReportTab('deudas')}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
-              reportTab === 'deudas' 
-                ? 'bg-red-700 text-white shadow-xs' 
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Deudas Pendientes por Socio</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Selector de Fuente de Datos: Real vs Histórico Demo */}
+          <div className="flex bg-slate-100 p-1 rounded-xl space-x-1 text-xs font-bold border border-slate-200">
+            <button
+              onClick={() => setDataSource('real')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                dataSource === 'real' 
+                  ? 'bg-slate-900 text-white shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Datos Reales del Sistema ({socios.length} Socios)</span>
+            </button>
+            <button
+              onClick={() => setDataSource('historico')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                dataSource === 'historico' 
+                  ? 'bg-slate-900 text-white shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Planilla Histórica (Demo)</span>
+            </button>
+          </div>
+
+          {/* Tab Switcher: Ingresos vs Deudas */}
+          <div className="flex bg-slate-100 p-1 rounded-xl space-x-1 text-xs font-bold border border-slate-200">
+            <button
+              onClick={() => setReportTab('recaudados')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                reportTab === 'recaudados' 
+                  ? 'bg-red-700 text-white shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Ingresos Recaudados</span>
+            </button>
+            <button
+              onClick={() => setReportTab('deudas')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                reportTab === 'deudas' 
+                  ? 'bg-red-700 text-white shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Deudas Pendientes</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -408,6 +588,9 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
           <Filter className="w-4 h-4 text-red-700" />
           <span>
             Filtros para: {reportTab === 'recaudados' ? 'Ingresos Recaudados por Socio' : 'Deudas Pendientes por Socio'}
+          </span>
+          <span className="ml-auto text-[11px] font-bold text-slate-500 lowercase">
+            {dataSource === 'real' ? `modo: datos del sistema (${socios.length} afiliados)` : 'modo: archivo histórico demo'}
           </span>
         </div>
 
@@ -441,6 +624,7 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
             >
               <option value="TODOS">TODAS</option>
               <option value="Conductores">Conductores</option>
+              <option value="Propietario">Propietario</option>
               <option value="Inquilinos">Inquilinos</option>
               <option value="Directorio">Directorio</option>
             </select>
@@ -490,17 +674,31 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
           </div>
         </div>
 
-        {/* Quick Actions & Search */}
+        {/* Quick Actions, Filtro de Deuda & Search */}
         <div className="flex flex-wrap justify-between items-center gap-3 pt-2 border-t border-slate-100">
-          <div className="relative w-72">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar por interno o nombre de socio..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs"
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-72">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por interno o nombre de socio..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs"
+              />
+            </div>
+
+            {reportTab === 'deudas' && (
+              <label className="flex items-center space-x-1.5 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={soloConDeuda}
+                  onChange={(e) => setSoloConDeuda(e.target.checked)}
+                  className="rounded text-red-700 focus:ring-red-500 w-3.5 h-3.5 cursor-pointer"
+                />
+                <span>Solo socios con saldo pendiente</span>
+              </label>
+            )}
           </div>
 
           <div className="flex space-x-2">
@@ -532,10 +730,14 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
           <div className="bg-slate-200/80 border border-slate-300 rounded-lg p-2 flex items-center justify-between text-xs text-slate-600 mb-4 no-print">
             <div className="flex items-center space-x-2">
               <FileText className="w-4 h-4 text-red-700" />
-              <span className="font-bold text-slate-800">JasperViewer - Ingresos Recaudados por Socio.jrxml</span>
+              <span className="font-bold text-slate-800">
+                JasperViewer - Ingresos Recaudados por Socio ({dataSource === 'real' ? 'Datos Reales' : 'Histórico Demo'})
+              </span>
             </div>
             <div className="flex items-center space-x-3 text-[11px] font-mono">
-              <span>{filteredIngresos.length} Registros</span>
+              <span className="font-bold text-slate-900">
+                {filteredIngresos.length} Registros {dataSource === 'real' ? `(de ${socios.length} en sistema)` : ''}
+              </span>
               <span>Zoom: 100%</span>
             </div>
           </div>
@@ -556,7 +758,8 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
             <table className="w-full text-[11px] text-left border-collapse border border-slate-400 font-mono">
               <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-400">
                 <tr className="divide-x divide-slate-300 text-center">
-                  <th className="p-2 w-16 bg-slate-200 text-slate-900 font-sans">Interno</th>
+                  <th className="p-2 w-14 bg-slate-200 text-slate-900 font-sans">Interno</th>
+                  <th className="p-2 text-left min-w-[130px] font-sans">Nombre Afiliado</th>
                   <th className="p-2">Ahorro<br/><span className="text-[9px] text-slate-500">Bs</span></th>
                   <th className="p-2">Jefe de<br/>línea Bs</th>
                   <th className="p-2">Mantenim.<br/>GPS Julio</th>
@@ -575,40 +778,63 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {filteredIngresos.map((row) => {
-                  const rowTotal = row.ahorro + row.jefeLinea + row.gpsJulio + row.gpsMarzo + 
-                    row.minPunta + row.proMarzo + row.sostenimiento + row.pandemia + row.retrasado + 
-                    row.colaboracion + row.prestamo + row.interes + row.proSede + row.proGps2;
+                {filteredIngresos.length === 0 ? (
+                  <tr>
+                    <td colSpan="17" className="py-12 text-center text-slate-400">
+                      <FileSpreadsheet className="w-10 h-10 mx-auto mb-2 text-slate-300 stroke-1" />
+                      <p className="font-bold text-slate-700 text-sm">
+                        {dataSource === 'real' && socios.length === 0 
+                          ? 'Padrón de Socios en Cero (0 Registros en Sistema)'
+                          : 'Sin registros de recaudación para los filtros seleccionados'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                        {dataSource === 'real' && socios.length === 0
+                          ? 'El sistema está en blanco tras la puesta a cero. Al registrar nuevos afiliados en el Padrón y cobrar cuotas, aparecerán aquí automáticamente con sus números de interno reales.'
+                          : 'Verifique el rango de fechas, categoría o término de búsqueda seleccionado.'}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredIngresos.map((row) => {
+                    const rowTotal = row.ahorro + row.jefeLinea + row.gpsJulio + row.gpsMarzo + 
+                      row.minPunta + row.proMarzo + row.sostenimiento + row.pandemia + row.retrasado + 
+                      row.colaboracion + row.prestamo + row.interes + row.proSede + row.proGps2;
 
-                  return (
-                    <tr key={row.interno} className="divide-x divide-slate-200 hover:bg-red-50/50 transition">
-                      <td className="p-1.5 text-center font-bold text-slate-900 bg-slate-50/80 font-sans">
-                        {row.interno}
-                      </td>
-                      <td className="p-1.5 text-right">{row.ahorro.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.jefeLinea.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.gpsJulio.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.gpsMarzo.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.minPunta.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.proMarzo.toFixed(1)}</td>
-                      <td className="p-1.5 text-right font-semibold">{row.sostenimiento.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.pandemia.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.retrasado.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.colaboracion.toFixed(1)}</td>
-                      <td className="p-1.5 text-right text-blue-700 font-bold">{row.prestamo.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.interes.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.proSede.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.proGps2.toFixed(1)}</td>
-                      <td className="p-1.5 text-right font-extrabold bg-slate-50 text-slate-900 font-sans">
-                        {rowTotal.toFixed(1)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                    return (
+                      <tr key={row.interno} className="divide-x divide-slate-200 hover:bg-red-50/50 transition">
+                        <td className="p-1.5 text-center font-bold text-slate-900 bg-slate-50/80 font-sans">
+                          {row.interno}
+                        </td>
+                        <td className="p-1.5 text-left font-sans font-semibold text-slate-800 truncate max-w-[150px]">
+                          {row.nombre}
+                        </td>
+                        <td className="p-1.5 text-right">{row.ahorro.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.jefeLinea.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.gpsJulio.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.gpsMarzo.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.minPunta.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.proMarzo.toFixed(1)}</td>
+                        <td className="p-1.5 text-right font-semibold">{row.sostenimiento.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.pandemia.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.retrasado.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.colaboracion.toFixed(1)}</td>
+                        <td className="p-1.5 text-right text-blue-700 font-bold">{row.prestamo.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.interes.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.proSede.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.proGps2.toFixed(1)}</td>
+                        <td className="p-1.5 text-right font-extrabold bg-slate-50 text-slate-900 font-sans">
+                          {rowTotal.toFixed(1)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
               <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-500 divide-x divide-slate-300">
                 <tr className="text-right">
-                  <td className="p-2 text-center text-slate-900 uppercase font-sans">TOTALES</td>
+                  <td className="p-2 text-center text-slate-900 uppercase font-sans" colSpan={2}>
+                    TOTALES ({filteredIngresos.length})
+                  </td>
                   <td className="p-2">{totalsIngresos.ahorro.toFixed(1)}</td>
                   <td className="p-2">{totalsIngresos.jefeLinea.toFixed(1)}</td>
                   <td className="p-2">{totalsIngresos.gpsJulio.toFixed(1)}</td>
@@ -647,10 +873,14 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
           <div className="bg-slate-200/80 border border-slate-300 rounded-lg p-2 flex items-center justify-between text-xs text-slate-600 mb-4 no-print">
             <div className="flex items-center space-x-2">
               <FileText className="w-4 h-4 text-red-700" />
-              <span className="font-bold text-slate-800">JasperViewer - Deudas Pendientes por Socio.jrxml</span>
+              <span className="font-bold text-slate-800">
+                JasperViewer - Deudas Pendientes por Socio ({dataSource === 'real' ? 'Datos Reales' : 'Histórico Demo'})
+              </span>
             </div>
             <div className="flex items-center space-x-3 text-[11px] font-mono">
-              <span>{filteredDeudas.length} Registros</span>
+              <span className="font-bold text-slate-900">
+                {filteredDeudas.length} Registros {dataSource === 'real' ? `(de ${socios.length} en sistema)` : ''}
+              </span>
               <span>Zoom: 100%</span>
             </div>
           </div>
@@ -671,7 +901,8 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
             <table className="w-full text-[11px] text-left border-collapse border border-slate-400 font-mono">
               <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-400">
                 <tr className="divide-x divide-slate-300 text-center">
-                  <th className="p-2 w-16 bg-slate-200 text-slate-900 font-sans">Interno</th>
+                  <th className="p-2 w-14 bg-slate-200 text-slate-900 font-sans">Interno</th>
+                  <th className="p-2 text-left min-w-[130px] font-sans">Nombre Afiliado</th>
                   <th className="p-2">Sostenim.<br/>Retrasado</th>
                   <th className="p-2">Inasistenc.<br/>Reunión Bs</th>
                   <th className="p-2">Mantenim.<br/>GPS Julio</th>
@@ -687,37 +918,60 @@ export default function ReportesPage({ socios = [], deudas = [], cajas = [], egr
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {filteredDeudas.map((row) => {
-                  const rowTotal = row.retrasado + row.inasistencia + row.gpsJulio + row.pandemia + 
-                    row.interes + row.prestamo + row.colaboracion + row.promanten + row.guardaBarro + 
-                    row.llanta + row.gpsMarzo;
+                {filteredDeudas.length === 0 ? (
+                  <tr>
+                    <td colSpan="14" className="py-12 text-center text-slate-400">
+                      <AlertTriangle className="w-10 h-10 mx-auto mb-2 text-slate-300 stroke-1" />
+                      <p className="font-bold text-slate-700 text-sm">
+                        {dataSource === 'real' && socios.length === 0 
+                          ? 'Padrón de Socios en Cero (0 Registros en Sistema)'
+                          : 'Sin registros de deudas pendientes para los filtros seleccionados'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                        {dataSource === 'real' && socios.length === 0
+                          ? 'El sistema está en blanco tras la puesta a cero. Al registrar nuevos afiliados en el Padrón y asignarles cuotas, aparecerán aquí automáticamente con sus números de interno reales.'
+                          : 'No hay socios con saldos pendientes según los criterios actuales.'}
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDeudas.map((row) => {
+                    const rowTotal = row.retrasado + row.inasistencia + row.gpsJulio + row.pandemia + 
+                      row.interes + row.prestamo + row.colaboracion + row.promanten + row.guardaBarro + 
+                      row.llanta + row.gpsMarzo;
 
-                  return (
-                    <tr key={row.interno} className="divide-x divide-slate-200 hover:bg-red-50/50 transition">
-                      <td className="p-1.5 text-center font-bold text-slate-900 bg-slate-50/80 font-sans">
-                        {row.interno}
-                      </td>
-                      <td className="p-1.5 text-right">{row.retrasado.toFixed(1)}</td>
-                      <td className="p-1.5 text-right text-rose-600 font-bold">{row.inasistencia.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.gpsJulio.toFixed(1)}</td>
-                      <td className="p-1.5 text-right font-semibold">{row.pandemia.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.interes.toFixed(1)}</td>
-                      <td className="p-1.5 text-right text-blue-700 font-bold">{row.prestamo.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.colaboracion.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.promanten.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.guardaBarro.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.llanta.toFixed(1)}</td>
-                      <td className="p-1.5 text-right">{row.gpsMarzo.toFixed(1)}</td>
-                      <td className="p-1.5 text-right font-black bg-red-50 text-red-900 font-sans">
-                        {rowTotal.toFixed(1)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                    return (
+                      <tr key={row.interno} className="divide-x divide-slate-200 hover:bg-red-50/50 transition">
+                        <td className="p-1.5 text-center font-bold text-slate-900 bg-slate-50/80 font-sans">
+                          {row.interno}
+                        </td>
+                        <td className="p-1.5 text-left font-sans font-semibold text-slate-800 truncate max-w-[150px]">
+                          {row.nombre}
+                        </td>
+                        <td className="p-1.5 text-right">{row.retrasado.toFixed(1)}</td>
+                        <td className="p-1.5 text-right text-rose-600 font-bold">{row.inasistencia.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.gpsJulio.toFixed(1)}</td>
+                        <td className="p-1.5 text-right font-semibold">{row.pandemia.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.interes.toFixed(1)}</td>
+                        <td className="p-1.5 text-right text-blue-700 font-bold">{row.prestamo.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.colaboracion.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.promanten.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.guardaBarro.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.llanta.toFixed(1)}</td>
+                        <td className="p-1.5 text-right">{row.gpsMarzo.toFixed(1)}</td>
+                        <td className="p-1.5 text-right font-black bg-red-50 text-red-900 font-sans">
+                          {rowTotal.toFixed(1)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
               <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-500 divide-x divide-slate-300">
                 <tr className="text-right">
-                  <td className="p-2 text-center text-slate-900 uppercase font-sans">TOTALES</td>
+                  <td className="p-2 text-center text-slate-900 uppercase font-sans" colSpan={2}>
+                    TOTALES ({filteredDeudas.length})
+                  </td>
                   <td className="p-2">{totalsDeudas.retrasado.toFixed(1)}</td>
                   <td className="p-2 text-rose-700">{totalsDeudas.inasistencia.toFixed(1)}</td>
                   <td className="p-2">{totalsDeudas.gpsJulio.toFixed(1)}</td>

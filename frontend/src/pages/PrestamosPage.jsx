@@ -11,18 +11,12 @@ import {
   User, 
   X,
   Clock,
-  TrendingDown
+  TrendingDown,
+  Trash2
 } from 'lucide-react';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { createEgresoAPI, createDeudaAPI } from '../utils/api';
 import { printIsolatedDocument, generatePlanDePagosHTML } from '../utils/printHelper';
-
-const DEFAULT_PRESTAMOS = [
-  { folio: 'PR-2026-0891', socio: 'Carlos Mendoza', socioId: 12, original: 50000, saldo: 12500, cuota: 2486.21, plazo: 24, vencimiento: '15/09/2026', estado: 'AL DÍA' },
-  { folio: 'PR-2026-0942', socio: 'Ana Ramírez', socioId: 178, original: 15000, saldo: 8000, cuota: 1332.40, plazo: 12, vencimiento: '10/09/2026', estado: 'ATRASO' },
-  { folio: 'PR-2026-1005', socio: 'Jorge López', socioId: 4, original: 120000, saldo: 115000, cuota: 5600.00, plazo: 36, vencimiento: '20/09/2026', estado: 'AL DÍA' },
-  { folio: 'PR-2025-0450', socio: 'María Torres', socioId: 1, original: 30000, saldo: 0, cuota: 0, plazo: 12, vencimiento: 'Cancelado', estado: 'PAGADO' }
-];
 
 export default function PrestamosPage({ 
   socios = [], 
@@ -32,9 +26,22 @@ export default function PrestamosPage({
   setEgresos, 
   deudas = [], 
   setDeudas, 
+  prestamos: propPrestamos,
+  setPrestamos: propSetPrestamos,
   currentUser 
 }) {
-  const [prestamos, setPrestamos] = useState(() => loadFromStorage('siscob_prestamos', DEFAULT_PRESTAMOS));
+  const [localPrestamos, setLocalPrestamos] = useState(() => loadFromStorage('siscob_prestamos', []));
+  const prestamos = propPrestamos !== undefined ? propPrestamos : localPrestamos;
+  const setPrestamos = propSetPrestamos || setLocalPrestamos;
+
+  useEffect(() => {
+    // Si el padrón de socios está en cero (puesta a cero activa), limpiar automáticamente préstamos ficticios
+    if (socios.length === 0 && prestamos.some(p => ['PR-2026-0891', 'PR-2026-0942', 'PR-2026-1005', 'PR-2025-0450'].includes(p.folio))) {
+      setPrestamos([]);
+      saveToStorage('siscob_prestamos', []);
+    }
+  }, [socios, prestamos, setPrestamos]);
+
   useEffect(() => {
     saveToStorage('siscob_prestamos', prestamos);
   }, [prestamos]);
@@ -216,6 +223,15 @@ export default function PrestamosPage({
     setTimeout(() => setLoanSuccessMsg(null), 5000);
   };
 
+  const handleVaciarCartera = () => {
+    if (window.confirm('¿Está seguro de reiniciar la cartera de préstamos a cero? Esta acción eliminará todos los préstamos registrados actualmente.')) {
+      setPrestamos([]);
+      saveToStorage('siscob_prestamos', []);
+      setLoanSuccessMsg('Cartera de préstamos reiniciada a cero.');
+      setTimeout(() => setLoanSuccessMsg(null), 4000);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-fadeIn">
       {/* Toast Notificación */}
@@ -235,7 +251,17 @@ export default function PrestamosPage({
           </h1>
           <p className="text-xs text-slate-500">Gestión de cartera, simulador de cuotas y desembolsos automáticos para afiliados</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {prestamos.length > 0 && (
+            <button
+              onClick={handleVaciarCartera}
+              className="flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3.5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+              title="Borrar todos los préstamos y dejar cartera en cero"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Vaciar a Cero</span>
+            </button>
+          )}
           <button
             onClick={() => {
               setActivePlanData(null);
@@ -279,29 +305,43 @@ export default function PrestamosPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-sans">
-                {prestamos.map((p) => (
-                  <tr key={p.folio} className="hover:bg-slate-50 transition">
-                    <td className="p-3">
-                      <div className="font-bold text-slate-900">{p.socio}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{p.folio} • Móvil #{p.socioId || p.id}</div>
-                    </td>
-                    <td className="p-3 font-mono font-bold text-right text-slate-800">Bs {p.original.toLocaleString()}</td>
-                    <td className="p-3 font-mono font-bold text-right text-red-700">Bs {p.saldo.toLocaleString()}</td>
-                    <td className="p-3 font-mono font-semibold text-right text-slate-700">Bs {parseFloat(p.cuota).toFixed(2)}</td>
-                    <td className="p-3 text-center font-mono">{p.plazo || 12}m</td>
-                    <td className="p-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        p.estado === 'AL DÍA' 
-                          ? 'bg-emerald-100 text-emerald-800' 
-                          : p.estado === 'ATRASO' 
-                          ? 'bg-rose-100 text-rose-800' 
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {p.estado}
-                      </span>
+                {prestamos.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-12 text-center text-slate-400">
+                      <Landmark className="w-10 h-10 mx-auto mb-2 text-slate-300 stroke-1" />
+                      <p className="font-bold text-slate-600 text-sm">Cartera de Préstamos en Cero (0 créditos activos)</p>
+                      <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                        {socios.length === 0 
+                          ? 'El sistema está en blanco para operaciones limpias. Registre socios para otorgar créditos.'
+                          : 'Haga clic en "+ Otorgar Préstamo a Socio" para registrar un crédito.'}
+                      </p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  prestamos.map((p) => (
+                    <tr key={p.folio} className="hover:bg-slate-50 transition">
+                      <td className="p-3">
+                        <div className="font-bold text-slate-900">{p.socio}</div>
+                        <div className="text-[10px] font-mono text-slate-400">{p.folio} • Móvil #{p.socioId || p.id}</div>
+                      </td>
+                      <td className="p-3 font-mono font-bold text-right text-slate-800">Bs {p.original.toLocaleString()}</td>
+                      <td className="p-3 font-mono font-bold text-right text-red-700">Bs {p.saldo.toLocaleString()}</td>
+                      <td className="p-3 font-mono font-semibold text-right text-slate-700">Bs {parseFloat(p.cuota).toFixed(2)}</td>
+                      <td className="p-3 text-center font-mono">{p.plazo || 12}m</td>
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          p.estado === 'AL DÍA' 
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : p.estado === 'ATRASO' 
+                            ? 'bg-rose-100 text-rose-800' 
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {p.estado}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

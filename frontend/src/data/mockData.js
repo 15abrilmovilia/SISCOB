@@ -35,6 +35,12 @@ export const INITIAL_CAJAS = [
 // Egresos y Comprobantes en Cero
 export const INITIAL_EGRESOS = [];
 
+// Cartera de Préstamos en Cero (Producción Limpia)
+export const INITIAL_PRESTAMOS = [];
+
+// Historial de Recibos en Cero (Producción Limpia)
+export const INITIAL_RECIBOS = [];
+
 // Inventario de Almacén en Cero
 export const INITIAL_PRODUCTOS = [];
 

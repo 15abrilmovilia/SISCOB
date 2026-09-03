@@ -55,6 +55,14 @@ export default function CobranzasPage({ socios, deudas, setDeudas, cajas, setCaj
   const [historialRecibos, setHistorialRecibos] = useState(() => 
     loadFromStorage('siscob_recibos', INITIAL_HISTORIAL_RECIBOS)
   );
+
+  useEffect(() => {
+    if (socios.length === 0 && historialRecibos.some(r => r.socioId === 20 || [1084, 1083, 1082].includes(r.nroRecibo))) {
+      setHistorialRecibos([]);
+      saveToStorage('siscob_recibos', []);
+    }
+  }, [socios, historialRecibos]);
+
   useEffect(() => {
     saveToStorage('siscob_recibos', historialRecibos);
   }, [historialRecibos]);

@@ -83,7 +83,7 @@ export default function ReiniciarSistemaModal({
             <div>
               <strong className="block font-black text-amber-950">¡Acción Definitiva de Reinicio!</strong>
               <span>
-                Esta operación vaciará el padrón de socios, eliminará todas las deudas, multas, egresos y recibos anteriores, dejando el sistema en blanco para comenzar el registro real de este mes (Septiembre 2026).
+                Esta operación vaciará el padrón de socios, eliminará la cartera de préstamos, todas las deudas, multas, egresos y recibos anteriores, dejando el sistema en blanco para comenzar el registro real de este mes (Septiembre 2026).
               </span>
             </div>
           </div>

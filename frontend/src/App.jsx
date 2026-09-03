@@ -26,6 +26,7 @@ import {
   INITIAL_DEUDAS, 
   INITIAL_CAJAS, 
   INITIAL_EGRESOS,
+  INITIAL_PRESTAMOS,
   INITIAL_USERS,
   INITIAL_ROLES
 } from './data/mockData';
@@ -60,8 +61,14 @@ export default function App() {
   const [deudas, setDeudas] = useState(() => loadFromStorage(STORAGE_KEYS.DEUDAS, INITIAL_DEUDAS));
   const [cajas, setCajas] = useState(() => loadFromStorage(STORAGE_KEYS.CAJAS, INITIAL_CAJAS));
   const [egresos, setEgresos] = useState(() => loadFromStorage(STORAGE_KEYS.EGRESOS, INITIAL_EGRESOS));
+  const [prestamos, setPrestamos] = useState(() => loadFromStorage(STORAGE_KEYS.PRESTAMOS, INITIAL_PRESTAMOS));
   const [usuarios, setUsuarios] = useState(() => loadFromStorage(STORAGE_KEYS.USUARIOS, INITIAL_USERS));
   const [roles, setRoles] = useState(() => loadFromStorage(STORAGE_KEYS.ROLES, INITIAL_ROLES));
+
+  // Persistir cambios en préstamos
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.PRESTAMOS, prestamos);
+  }, [prestamos]);
 
   // Sync with Supabase on mount
   useEffect(() => {
@@ -132,7 +139,16 @@ export default function App() {
   };
 
   const handleExportBackup = () => {
-    exportBackupData({ socios, deudas, cajas, egresos, usuarios, roles });
+    exportBackupData({ 
+      socios, 
+      deudas, 
+      cajas, 
+      egresos, 
+      prestamos,
+      recibos: loadFromStorage(STORAGE_KEYS.RECIBOS, []),
+      usuarios, 
+      roles 
+    });
   };
 
   const handleImportBackup = (file) => {
@@ -143,6 +159,7 @@ export default function App() {
         if (data.deudas) setDeudas(data.deudas);
         if (data.cajas) setCajas(data.cajas);
         if (data.egresos) setEgresos(data.egresos);
+        if (data.prestamos) setPrestamos(data.prestamos);
         if (data.usuarios) setUsuarios(data.usuarios);
         if (data.roles) setRoles(data.roles);
         alert('Datos restaurados correctamente desde el respaldo.');
@@ -160,6 +177,7 @@ export default function App() {
     setSocios([]);
     setDeudas([]);
     setEgresos([]);
+    setPrestamos([]);
 
     const nuevasCajas = [
       { id: "c1", nombre: "CAJA GENERAL", saldoAnterior: saldoCajaGeneral, ingresos: 0.00, egresos: 0.00, saldoActual: saldoCajaGeneral },
@@ -171,6 +189,8 @@ export default function App() {
     saveToStorage(STORAGE_KEYS.SOCIOS, []);
     saveToStorage(STORAGE_KEYS.DEUDAS, []);
     saveToStorage(STORAGE_KEYS.EGRESOS, []);
+    saveToStorage(STORAGE_KEYS.PRESTAMOS, []);
+    saveToStorage(STORAGE_KEYS.RECIBOS, []);
     saveToStorage(STORAGE_KEYS.CAJAS, nuevasCajas);
 
     // 3. Notificar a endpoint backend si está en línea
@@ -181,7 +201,7 @@ export default function App() {
     }).catch(() => {});
 
     setActiveTab('socios');
-    alert('¡Puesta a Cero completada con éxito! Se ha limpiado el sistema y las cajas están listas para registrar este mes.');
+    alert('¡Puesta a Cero completada con éxito! Se ha limpiado el sistema (socios, deudas, préstamos y egresos) y las cajas están listas para registrar este mes.');
   };
 
   const handleGoToCobranza = (socioId) => {
@@ -324,6 +344,8 @@ export default function App() {
               setEgresos={setEgresos}
               deudas={deudas}
               setDeudas={setDeudas}
+              prestamos={prestamos}
+              setPrestamos={setPrestamos}
               currentUser={currentUser}
             />
           )}
@@ -347,6 +369,7 @@ export default function App() {
               deudas={deudas} 
               cajas={cajas} 
               egresos={egresos} 
+              prestamos={prestamos}
             />
           )}
           {activeTab === 'conciliacion' && (

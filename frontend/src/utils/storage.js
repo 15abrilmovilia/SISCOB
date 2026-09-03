@@ -4,6 +4,8 @@ const STORAGE_KEYS = {
   DEUDAS: 'siscob_deudas',
   CAJAS: 'siscob_cajas',
   EGRESOS: 'siscob_egresos',
+  PRESTAMOS: 'siscob_prestamos',
+  RECIBOS: 'siscob_recibos',
   USER: 'siscob_auth_user',
   SETTINGS: 'siscob_settings',
   USUARIOS: 'siscob_usuarios',
@@ -39,6 +41,8 @@ export function exportBackupData(data) {
       deudas: data.deudas,
       cajas: data.cajas,
       egresos: data.egresos,
+      prestamos: data.prestamos || [],
+      recibos: data.recibos || [],
       usuarios: data.usuarios,
       roles: data.roles
     }
