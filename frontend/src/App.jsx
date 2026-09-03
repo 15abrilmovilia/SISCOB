@@ -256,6 +256,9 @@ export default function App() {
           {activeTab === 'balance' && (
             <BalancePage 
               cajas={cajas}
+              egresos={egresos}
+              socios={socios}
+              currentUser={currentUser}
             />
           )}
           {activeTab === 'almacen' && (
