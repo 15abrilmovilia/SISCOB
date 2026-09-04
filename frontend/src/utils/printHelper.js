@@ -120,6 +120,7 @@ export function generatePlanDePagosHTML(planData) {
   const rowsHTML = planPagos.map(p => `
     <tr style="border-bottom: 1px solid #cbd5e1; font-family: 'JetBrains Mono', monospace; font-size: 11px;">
       <td style="padding: 6px 8px; text-align: center; font-weight: bold; color: #475569;">${p.nro}</td>
+      <td style="padding: 6px 8px; text-align: center; font-weight: 700; color: #b91c1c;">${p.fechaLimite || 'Por definir'}</td>
       <td style="padding: 6px 8px; text-align: right; font-weight: 800; color: #0f172a;">Bs ${p.cuota.toFixed(2)}</td>
       <td style="padding: 6px 8px; text-align: right; color: #059669; font-weight: 600;">Bs ${p.capital.toFixed(2)}</td>
       <td style="padding: 6px 8px; text-align: right; color: #d97706; font-weight: 600;">Bs ${p.interes.toFixed(2)}</td>
@@ -190,6 +191,7 @@ export function generatePlanDePagosHTML(planData) {
         <thead>
           <tr style="background: #0f172a; color: #ffffff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">
             <th style="padding: 7px 8px; text-align: center; border: 1px solid #0f172a;">N° Cuota</th>
+            <th style="padding: 7px 8px; text-align: center; border: 1px solid #0f172a;">Fecha Límite Pago</th>
             <th style="padding: 7px 8px; text-align: right; border: 1px solid #0f172a;">Cuota Fija (Bs)</th>
             <th style="padding: 7px 8px; text-align: right; border: 1px solid #0f172a;">Amortiz. Capital</th>
             <th style="padding: 7px 8px; text-align: right; border: 1px solid #0f172a;">Interés Mensual</th>
@@ -201,7 +203,7 @@ export function generatePlanDePagosHTML(planData) {
         </tbody>
         <tfoot>
           <tr style="background: #f1f5f9; font-weight: 900; font-family: 'JetBrains Mono', monospace; font-size: 11px; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a;">
-            <td style="padding: 8px; text-align: center; font-family: 'Inter';">TOTALES</td>
+            <td style="padding: 8px; text-align: center; font-family: 'Inter';" colspan="2">TOTALES</td>
             <td style="padding: 8px; text-align: right; color: #b91c1c;">Bs ${totalPagar.toFixed(2)}</td>
             <td style="padding: 8px; text-align: right; color: #059669;">Bs ${totalCapital.toFixed(2)}</td>
             <td style="padding: 8px; text-align: right; color: #d97706;">Bs ${totalInteres.toFixed(2)}</td>

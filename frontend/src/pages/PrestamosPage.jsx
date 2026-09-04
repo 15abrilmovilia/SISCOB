@@ -57,11 +57,11 @@ export default function PrestamosPage({
   const [isNewLoanModalOpen, setIsNewLoanModalOpen] = useState(false);
   const [socioSearch, setSocioSearch] = useState('');
   const [selectedSocio, setSelectedSocio] = useState(null);
-  const [cajaDesembolso, setCajaDesembolso] = useState('c5'); // c5 = Cartera de Préstamos
+  const [cajaDesembolso, setCajaDesembolso] = useState('c4'); // c4 = Caja Préstamos
   const [loanSuccessMsg, setLoanSuccessMsg] = useState(null);
 
-  // Loan calculation logic
-  const calcularDetallesPrestamo = (pMonto, pPlazo, pTasaAnual) => {
+  // Loan calculation logic with exact payment deadline dates (fechas límite)
+  const calcularDetallesPrestamo = (pMonto, pPlazo, pTasaAnual, pDiaPago = 15) => {
     const tasaMensual = (pTasaAnual / 100) / 12;
     const cuotaMensual = (pMonto * (tasaMensual * Math.pow(1 + tasaMensual, pPlazo))) / (Math.pow(1 + tasaMensual, pPlazo) - 1);
     const totalPagar = cuotaMensual * pPlazo;
@@ -69,16 +69,30 @@ export default function PrestamosPage({
 
     const planPagos = [];
     let saldoRestante = pMonto;
+    const hoy = new Date();
+
     for (let i = 1; i <= pPlazo; i++) {
       const interesCuota = saldoRestante * tasaMensual;
       const capitalCuota = cuotaMensual - interesCuota;
       saldoRestante -= capitalCuota;
+
+      // Calcular fecha límite mensual sucesiva (día 15 de cada mes)
+      const d = new Date(hoy.getFullYear(), hoy.getMonth() + i, pDiaPago);
+      const fechaISO = d.toISOString().split('T')[0];
+      const diaStr = String(d.getDate()).padStart(2, '0');
+      const mesStr = String(d.getMonth() + 1).padStart(2, '0');
+      const anioStr = d.getFullYear();
+      const fechaFormateada = `${diaStr}/${mesStr}/${anioStr}`;
+
       planPagos.push({
         nro: i,
+        fechaLimite: fechaFormateada,
+        fechaLimiteISO: fechaISO,
         cuota: cuotaMensual,
         capital: capitalCuota,
         interes: interesCuota,
-        saldo: Math.max(0, saldoRestante)
+        saldo: Math.max(0, saldoRestante),
+        pagado: false
       });
     }
 
@@ -91,11 +105,13 @@ export default function PrestamosPage({
   const sociosFiltrados = socios.filter(s => {
     if (!socioSearch.trim()) return false;
     const term = socioSearch.toLowerCase();
+    const movil = (s.nroMovil || s.id || '').toString().toLowerCase();
     return (
+      movil.includes(term) ||
       s.id.toString().includes(term) ||
-      s.nombres.toLowerCase().includes(term) ||
-      s.apPaterno.toLowerCase().includes(term) ||
-      s.ci.includes(term)
+      (s.nombres && s.nombres.toLowerCase().includes(term)) ||
+      (s.apPaterno && s.apPaterno.toLowerCase().includes(term)) ||
+      (s.ci && s.ci.toLowerCase().includes(term))
     );
   });
 
@@ -114,28 +130,35 @@ export default function PrestamosPage({
     const { cuotaMensual, planPagos } = currentCalc;
     const folio = `PR-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     const nombreCompleto = `${selectedSocio.nombres} ${selectedSocio.apPaterno} ${selectedSocio.apMaterno || ''}`.trim();
+    const primeraCuota = planPagos[0];
 
-    // 1. Crear Préstamo en Estado
+    // 1. Crear Préstamo en Estado con cronograma de pagos y fechas límite
     const nuevoPrestamo = {
       folio,
       socio: nombreCompleto,
       socioId: selectedSocio.id,
+      socioMovil: selectedSocio.nroMovil || selectedSocio.id,
+      socioCI: selectedSocio.ci,
       original: monto,
       saldo: monto,
       cuota: cuotaMensual,
       plazo,
-      vencimiento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('es-BO'),
+      tasaAnual,
+      fechaDesembolso: new Date().toISOString().split('T')[0],
+      vencimiento: primeraCuota ? primeraCuota.fechaLimite : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('es-BO'),
+      proximoVencimiento: primeraCuota ? primeraCuota.fechaLimiteISO : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      planPagos,
       estado: 'AL DÍA'
     };
 
     setPrestamos([nuevoPrestamo, ...prestamos]);
 
-    // 2. Registrar Egreso Contable de Desembolso (Supabase + Local)
+    // 2. Registrar Egreso Contable de Desembolso en Caja 4 (Supabase + Local)
     const egresoPayload = {
       nroBoleta: `EGR-${folio.replace('PR-', 'DES-')}`,
       cajaId: cajaDesembolso,
       categoria: 'DESEMBOLSO DE PRÉSTAMO',
-      beneficiario: `(MÓVIL ${selectedSocio.id}) ${nombreCompleto} - CI: ${selectedSocio.ci}`,
+      beneficiario: `(MÓVIL #${selectedSocio.nroMovil || selectedSocio.id}) ${nombreCompleto} - CI: ${selectedSocio.ci}`,
       concepto: `DESEMBOLSO DE CRÉDITO INSTITUCIONAL ${folio} A ${plazo} MESES`,
       monto: monto,
       responsable: currentUser?.nombre || 'Administrador Central'
@@ -158,7 +181,7 @@ export default function PrestamosPage({
       }, ...prev]);
     }
 
-    // 3. Descontar dinero de la Caja de Desembolso
+    // 3. Descontar dinero de la Caja de Desembolso (Caja 4)
     if (setCajas) {
       setCajas(prev => prev.map(c => 
         c.id === cajaDesembolso 
@@ -167,20 +190,24 @@ export default function PrestamosPage({
       ));
     }
 
-    // 4. Generar las Cuotas Mensuales para cobrar en Caja Rápida
-    const hoy = new Date();
+    // 4. Generar las Cuotas Mensuales con FECHA LÍMITE para cobrar en Caja Rápida
     const nuevasDeudas = [];
     for (let i = 1; i <= Math.min(plazo, 12); i++) {
-      const fechaVenc = new Date(hoy.getFullYear(), hoy.getMonth() + i, 15);
+      const cuotaItem = planPagos[i - 1];
+      const fechaVencISO = cuotaItem?.fechaLimiteISO || new Date(Date.now() + i * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const fechaVencFormatted = cuotaItem?.fechaLimite || `${15}/${i}/2026`;
+
       const deudaItem = {
         id: `d-pr-${Date.now()}-${i}`,
         socioId: selectedSocio.id,
-        conceptoId: 7, // Amortización
-        descripcion: `Cuota Préstamo ${i}/${plazo} (${folio})`,
-        periodo: `Mes ${i}`,
+        conceptoId: 7, // Amortización de Préstamo (Caja 4)
+        cajaId: 'c4',
+        descripcion: `Cuota Préstamo ${i}/${plazo} (${folio}) - Vence: ${fechaVencFormatted}`,
+        periodo: `Cuota ${i} (${fechaVencFormatted})`,
         monto: parseFloat(cuotaMensual.toFixed(2)),
         pagado: false,
-        fecha: fechaVenc.toISOString().split('T')[0],
+        fecha: fechaVencISO,
+        fechaVencimiento: fechaVencISO,
         moneda: 'Bs',
         cantidad: 1
       };
@@ -193,7 +220,7 @@ export default function PrestamosPage({
         descripcion: deudaItem.descripcion,
         periodo: deudaItem.periodo,
         monto: deudaItem.monto,
-        fechaVencimiento: deudaItem.fecha
+        fechaVencimiento: deudaItem.fechaVencimiento
       });
     }
 
@@ -301,13 +328,15 @@ export default function PrestamosPage({
                   <th className="p-3 text-right">Saldo Restante</th>
                   <th className="p-3 text-right">Cuota Mensual</th>
                   <th className="p-3 text-center">Plazo</th>
+                  <th className="p-3 text-center">Fecha Límite / Vencimiento</th>
                   <th className="p-3 text-center">Estado</th>
+                  <th className="p-3 text-center">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-sans">
                 {prestamos.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-12 text-center text-slate-400">
+                    <td colSpan="8" className="py-12 text-center text-slate-400">
                       <Landmark className="w-10 h-10 mx-auto mb-2 text-slate-300 stroke-1" />
                       <p className="font-bold text-slate-600 text-sm">Cartera de Préstamos en Cero (0 créditos activos)</p>
                       <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
@@ -322,22 +351,41 @@ export default function PrestamosPage({
                     <tr key={p.folio} className="hover:bg-slate-50 transition">
                       <td className="p-3">
                         <div className="font-bold text-slate-900">{p.socio}</div>
-                        <div className="text-[10px] font-mono text-slate-400">{p.folio} • Móvil #{p.socioId || p.id}</div>
+                        <div className="text-[10px] font-mono text-slate-400">{p.folio} • Móvil #{p.socioMovil || p.socioId || p.id}</div>
                       </td>
                       <td className="p-3 font-mono font-bold text-right text-slate-800">Bs {p.original.toLocaleString()}</td>
                       <td className="p-3 font-mono font-bold text-right text-red-700">Bs {p.saldo.toLocaleString()}</td>
                       <td className="p-3 font-mono font-semibold text-right text-slate-700">Bs {parseFloat(p.cuota).toFixed(2)}</td>
                       <td className="p-3 text-center font-mono">{p.plazo || 12}m</td>
+                      <td className="p-3 text-center font-mono">
+                        <span className="inline-flex items-center space-x-1 font-bold text-red-800 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md text-[11px]">
+                          <Clock className="w-3 h-3 text-red-600" />
+                          <span>{p.vencimiento || p.proximoVencimiento || 'Al día'}</span>
+                        </span>
+                      </td>
                       <td className="p-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                           p.estado === 'AL DÍA' 
                             ? 'bg-emerald-100 text-emerald-800' 
-                            : p.estado === 'ATRASO' 
+                            : p.estado === 'ATRASO' || p.estado === 'VENCIDO'
                             ? 'bg-rose-100 text-rose-800' 
                             : 'bg-slate-100 text-slate-600'
                         }`}>
                           {p.estado}
                         </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => {
+                            setActivePlanData(p);
+                            setShowPlanModal(true);
+                          }}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition cursor-pointer flex items-center space-x-1 mx-auto"
+                          title="Ver cronograma y fechas límite de cuotas"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-red-700" />
+                          <span>Ver Plan</span>
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -694,6 +742,7 @@ export default function PrestamosPage({
                   <thead className="bg-slate-900 text-white font-bold text-[10px] uppercase">
                     <tr>
                       <th className="p-2 text-center">Nro</th>
+                      <th className="p-2 text-center text-amber-300">Fecha Límite Pago</th>
                       <th className="p-2 text-right">Cuota Fija (Bs)</th>
                       <th className="p-2 text-right">Capital</th>
                       <th className="p-2 text-right">Interés</th>
@@ -704,6 +753,7 @@ export default function PrestamosPage({
                     {(activePlanData?.planPagos || currentCalc.planPagos).map((p) => (
                       <tr key={p.nro} className="hover:bg-slate-50">
                         <td className="p-2 text-center font-bold text-slate-500">{p.nro}</td>
+                        <td className="p-2 text-center font-bold text-red-700 bg-red-50/50">{p.fechaLimite || 'Por definir'}</td>
                         <td className="p-2 text-right font-bold text-slate-900">{p.cuota.toFixed(2)}</td>
                         <td className="p-2 text-right text-emerald-700 font-semibold">{p.capital.toFixed(2)}</td>
                         <td className="p-2 text-right text-amber-700 font-semibold">{p.interes.toFixed(2)}</td>

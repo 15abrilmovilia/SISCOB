@@ -28,6 +28,7 @@ export default function DashboardPage({
   socios = [], 
   deudas = [], 
   egresos = [],
+  prestamos = [],
   currentUser,
   onGoToCobranza
 }) {
@@ -50,6 +51,131 @@ export default function DashboardPage({
   // 2. Socios en Mora reales
   const deudasPendientes = deudas.filter(d => !d.pagado);
   const totalDeudaPendienteMonto = deudasPendientes.reduce((acc, d) => acc + (parseFloat(d.monto) || 0), 0);
+
+  // 2.5 Alertas de Cuotas de Préstamos por Vencer o Vencidas (Monitoreo de Cartera)
+  const cuotasPrestamosAlertas = useMemo(() => {
+    const alertas = [];
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    // A. Buscar en el array de préstamos registrados
+    prestamos.forEach(p => {
+      const socio = socios.find(s => s.id === p.socioId);
+      const socioNombre = p.socio || (socio ? `${socio.nombres} ${socio.apPaterno}` : `Socio #${p.socioId}`);
+      const movilDisplay = p.socioMovil || socio?.nroMovil || p.socioId || '';
+
+      if (p.planPagos && Array.isArray(p.planPagos)) {
+        p.planPagos.forEach(cuota => {
+          if (cuota.pagado) return;
+
+          // Parse fechaLimite
+          let fechaD = null;
+          if (cuota.fechaLimiteISO) {
+            fechaD = new Date(cuota.fechaLimiteISO);
+          } else if (cuota.fechaLimite) {
+            const parts = cuota.fechaLimite.split('/');
+            if (parts.length === 3) {
+              fechaD = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            }
+          }
+          
+          if (!fechaD || isNaN(fechaD.getTime())) {
+            fechaD = new Date(hoy.getTime() + cuota.nro * 30 * 24 * 60 * 60 * 1000);
+          }
+          fechaD.setHours(0, 0, 0, 0);
+
+          const diffTime = fechaD.getTime() - hoy.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          // Alertar si está vencida (< 0) o vence en los próximos 15 días (<= 15)
+          if (diffDays <= 15) {
+            alertas.push({
+              id: `p-${p.folio}-${cuota.nro}`,
+              socioId: p.socioId,
+              socioNombre,
+              movil: movilDisplay,
+              folio: p.folio,
+              cuotaNro: cuota.nro,
+              totalCuotas: p.plazo || p.planPagos.length,
+              monto: parseFloat(cuota.cuota),
+              fechaLimite: cuota.fechaLimite || fechaD.toLocaleDateString('es-BO'),
+              diffDays,
+              estado: diffDays < 0 ? 'VENCIDA' : diffDays === 0 ? 'VENCE HOY' : 'POR VENCER'
+            });
+          }
+        });
+      } else if (p.proximoVencimiento || p.vencimiento) {
+        let fechaD = p.proximoVencimiento ? new Date(p.proximoVencimiento) : null;
+        if (!fechaD || isNaN(fechaD.getTime())) {
+          const parts = (p.vencimiento || '').split('/');
+          if (parts.length === 3) {
+            fechaD = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          }
+        }
+        if (fechaD && !isNaN(fechaD.getTime())) {
+          fechaD.setHours(0, 0, 0, 0);
+          const diffTime = fechaD.getTime() - hoy.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays <= 15) {
+            alertas.push({
+              id: `p-${p.folio}-next`,
+              socioId: p.socioId,
+              socioNombre,
+              movil: movilDisplay,
+              folio: p.folio,
+              cuotaNro: 1,
+              totalCuotas: p.plazo || 12,
+              monto: parseFloat(p.cuota),
+              fechaLimite: p.vencimiento || fechaD.toLocaleDateString('es-BO'),
+              diffDays,
+              estado: diffDays < 0 ? 'VENCIDA' : diffDays === 0 ? 'VENCE HOY' : 'POR VENCER'
+            });
+          }
+        }
+      }
+    });
+
+    // B. Complementar con deudas de préstamos pendientes en Caja Rápida
+    deudas.forEach(d => {
+      if (d.pagado) return;
+      const desc = (d.descripcion || '').toUpperCase();
+      const isLoanDebt = d.conceptoId === 7 || desc.includes('PRÉSTAMO') || desc.includes('PRESTAMO') || desc.includes('AMORTIZ');
+      if (!isLoanDebt) return;
+
+      const alreadyIn = alertas.some(a => a.socioId === d.socioId && Math.abs(a.monto - parseFloat(d.monto)) < 0.05);
+      if (alreadyIn) return;
+
+      const socio = socios.find(s => s.id === d.socioId);
+      const socioNombre = socio ? `${socio.nombres} ${socio.apPaterno}` : `Socio #${d.socioId}`;
+      const movilDisplay = socio?.nroMovil || d.socioId || '';
+
+      let fechaD = d.fechaVencimiento ? new Date(d.fechaVencimiento) : (d.fecha ? new Date(d.fecha) : null);
+      if (!fechaD || isNaN(fechaD.getTime())) {
+        fechaD = new Date();
+      }
+      fechaD.setHours(0, 0, 0, 0);
+      const diffTime = fechaD.getTime() - hoy.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 15) {
+        alertas.push({
+          id: `d-${d.id}`,
+          socioId: d.socioId,
+          socioNombre,
+          movil: movilDisplay,
+          folio: d.descripcion.includes('PR-') ? d.descripcion.match(/PR-[\w-]+/)?.[0] || 'CRÉDITO' : 'CRÉDITO',
+          cuotaNro: d.periodo || 'Cuota',
+          totalCuotas: '',
+          monto: parseFloat(d.monto),
+          fechaLimite: d.fechaVencimiento || fechaD.toLocaleDateString('es-BO'),
+          diffDays,
+          estado: diffDays < 0 ? 'VENCIDA' : diffDays === 0 ? 'VENCE HOY' : 'POR VENCER'
+        });
+      }
+    });
+
+    return alertas.sort((a, b) => a.diffDays - b.diffDays);
+  }, [prestamos, deudas, socios]);
 
   // Agrupar deudas por socio para ranking de mora
   const sociosMoraRanking = useMemo(() => {
@@ -142,9 +268,15 @@ export default function DashboardPage({
 
   // Alertas inteligentes reales
   const alertasInteligentes = [
+    ...(cuotasPrestamosAlertas.length > 0 ? [{
+      titulo: `${cuotasPrestamosAlertas.length} Cuota(s) de Préstamo por Cobrar`,
+      desc: `Hay cuotas con fecha límite próxima o vencidas en Caja 4. Monto a recuperar: Bs ${cuotasPrestamosAlertas.reduce((s, c) => s + c.monto, 0).toFixed(2)}.`,
+      severidad: cuotasPrestamosAlertas.some(c => c.diffDays < 0) ? 'danger' : 'warn',
+      tiempo: 'Atención Caja 4'
+    }] : []),
     {
       titulo: 'Corte de Caja Pendiente',
-      desc: 'Recuerda conciliar la Caja General antes del cierre de turno.',
+      desc: 'Recuerda conciliar las Cajas antes del cierre de turno.',
       severidad: 'warn',
       tiempo: 'Turno activo'
     },
@@ -351,6 +483,106 @@ export default function DashboardPage({
           </div>
         </button>
       </div>
+
+      {/* Panel Destacado de Notificaciones de Cuotas de Préstamos por Vencer / Vencidas */}
+      {cuotasPrestamosAlertas.length > 0 && (
+        <div className="bg-white rounded-2xl border-2 border-red-300 shadow-sm overflow-hidden animate-fadeIn">
+          <div className="bg-gradient-to-r from-red-800 via-red-700 to-amber-700 text-white p-4 flex flex-wrap justify-between items-center gap-3">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-white/20 rounded-xl">
+                <BadgeAlert className="w-5 h-5 text-amber-200 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm uppercase tracking-wide flex items-center space-x-2">
+                  <span>Notificaciones de Cobro: Cuotas de Préstamos por Vencer y Vencidas</span>
+                  <span className="bg-white text-red-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {cuotasPrestamosAlertas.length} {cuotasPrestamosAlertas.length === 1 ? 'Cuota' : 'Cuotas'}
+                  </span>
+                </h3>
+                <p className="text-[11px] text-red-100">
+                  Monitoreo de vencimientos para cobranza prioritaria en ventanilla de Caja Central
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('prestamos')}
+              className="bg-white/15 hover:bg-white/25 text-white border border-white/30 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+            >
+              <span>Ver Módulo Préstamos</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="p-4 overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="p-2.5">Móvil / Socio Prestatario</th>
+                  <th className="p-2.5">Folio / Cuota</th>
+                  <th className="p-2.5 text-center">Fecha Límite de Pago</th>
+                  <th className="p-2.5 text-right">Monto Cuota</th>
+                  <th className="p-2.5 text-center">Estado del Vencimiento</th>
+                  <th className="p-2.5 text-center">Acción Inmediata</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-sans">
+                {cuotasPrestamosAlertas.map(item => (
+                  <tr key={item.id} className="hover:bg-red-50/40 transition">
+                    <td className="p-2.5">
+                      <div className="font-bold text-slate-900">{item.socioNombre}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        Móvil <strong className="text-red-700">#{item.movil}</strong>
+                      </div>
+                    </td>
+                    <td className="p-2.5 font-mono">
+                      <div className="font-bold text-slate-800">{item.folio}</div>
+                      <div className="text-[10px] text-slate-500">
+                        {typeof item.cuotaNro === 'number' ? `Cuota ${item.cuotaNro} de ${item.totalCuotas}` : item.cuotaNro}
+                      </div>
+                    </td>
+                    <td className="p-2.5 text-center font-mono">
+                      <span className="inline-flex items-center space-x-1 font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-[11px]">
+                        <Clock className="w-3 h-3 text-slate-500" />
+                        <span>{item.fechaLimite}</span>
+                      </span>
+                    </td>
+                    <td className="p-2.5 font-mono font-black text-right text-sm text-red-700">
+                      Bs {item.monto.toFixed(2)}
+                    </td>
+                    <td className="p-2.5 text-center">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase inline-flex items-center space-x-1 ${
+                        item.diffDays < 0 
+                          ? 'bg-rose-100 text-rose-800 border border-rose-300 animate-pulse' 
+                          : item.diffDays === 0
+                          ? 'bg-red-600 text-white font-black'
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      }`}>
+                        <span>
+                          {item.diffDays < 0 
+                            ? `VENCIDO (hace ${Math.abs(item.diffDays)}d)` 
+                            : item.diffDays === 0 
+                            ? '¡VENCE HOY!' 
+                            : `Vence en ${item.diffDays} días`}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="p-2.5 text-center">
+                      <button
+                        onClick={() => onGoToCobranza ? onGoToCobranza(item.socioId) : setActiveTab('cobranzas')}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 shadow-xs inline-flex items-center space-x-1"
+                        title="Ir a ventanilla para cobrar esta cuota"
+                      >
+                        <HandCoins className="w-3.5 h-3.5" />
+                        <span>Cobrar en Ventanilla</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid: Chart + Critical Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

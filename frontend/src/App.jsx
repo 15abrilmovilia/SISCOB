@@ -328,6 +328,7 @@ export default function App() {
               socios={socios}
               deudas={deudas}
               egresos={egresos}
+              prestamos={prestamos}
               currentUser={currentUser}
               onGoToCobranza={handleGoToCobranza}
             />
