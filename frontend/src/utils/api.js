@@ -124,9 +124,17 @@ export async function registrarCobranzaAPI(cobranzaData) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cobranzaData)
     });
+    if (res.status === 409) {
+      const dupData = await res.json();
+      const error = new Error(dupData.message || 'Comprobante duplicado detectado.');
+      error.code = 'COMPROBANTE_DUPLICADO';
+      error.detail = dupData;
+      throw error;
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
+    if (err.code === 'COMPROBANTE_DUPLICADO') throw err;
     console.error('[SISCOB API] Error al registrar cobranza:', err.message);
     return null;
   }

@@ -138,7 +138,7 @@ export default function VoucherModal({ voucher, onClose }) {
             <div className="border-t border-b border-slate-800 py-2 flex justify-between items-center mb-12">
               <span className="font-bold text-sm">TOTAL CANCELADO:</span>
               <span className="font-mono font-extrabold text-base text-slate-900">
-                {voucher.moneda} {voucher.monto.toFixed(2)}
+                {voucher.moneda} {(parseFloat(voucher.monto) || 0).toFixed(2)}
               </span>
             </div>
 

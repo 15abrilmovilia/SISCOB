@@ -139,6 +139,31 @@ export default function CobranzasPage({
       return;
     }
 
+    // *** VALIDACIÓN DE COMPROBANTE DUPLICADO (Local) ***
+    if (nroTransaccion && nroTransaccion.trim() !== '') {
+      const comprobanteTrimmed = nroTransaccion.trim().toUpperCase();
+      const duplicadoLocal = historialRecibos.find(r => {
+        if (r.estado === 'ANULADO') return false;
+        // Verificar en observaciones (donde se guarda el Doc Banco)
+        const obs = (r.observaciones || '').toUpperCase();
+        const nroTrans = (r.nroTransaccion || '').toUpperCase();
+        return obs.includes(comprobanteTrimmed) || nroTrans === comprobanteTrimmed;
+      });
+
+      if (duplicadoLocal) {
+        const confirmar = window.confirm(
+          `⚠️ ¡ALERTA DE COMPROBANTE DUPLICADO!\n\n` +
+          `El N° de comprobante/transacción "${nroTransaccion}" ya fue utilizado en:\n\n` +
+          `• Recibo N°: ${duplicadoLocal.nroRecibo}\n` +
+          `• Socio: ${duplicadoLocal.socioNombre}\n` +
+          `• Monto: Bs ${parseFloat(duplicadoLocal.totalBs).toFixed(2)}\n` +
+          `• Fecha: ${duplicadoLocal.fecha}\n\n` +
+          `¿Desea continuar de todas formas? (Solo si está seguro que NO es duplicado)`
+        );
+        if (!confirmar) return;
+      }
+    }
+
     const chosenCaja = cajas.find(c => c.id === selectedCajaId) || cajas[0] || { id: 'c1', nombre: 'CAJA DE FRECUENCIA' };
     const nroRecibo = Math.floor(100000 + Math.random() * 900000);
 
@@ -175,11 +200,13 @@ export default function CobranzasPage({
     setHistorialRecibos(prev => [receiptData, ...prev]);
 
     // 3. Marcar deudas pagadas y actualizar saldos en el sistema
+    const prevDeudas = [...deudas];
     const updatedDeudas = deudas.map(d => 
       selectedDeudaIds.includes(d.id) ? { ...d, pagado: true, nroRecibo } : d
     );
     setDeudas(updatedDeudas);
 
+    const prevCajas = [...cajas];
     const updatedCajas = cajas.map(c => 
       c.id === chosenCaja.id 
         ? { ...c, ingresos: (c.ingresos || 0) + totalBs, saldoActual: (c.saldoActual || c.saldoAnterior || 0) + totalBs } 
@@ -187,6 +214,7 @@ export default function CobranzasPage({
     );
     setCajas(updatedCajas);
 
+    const prevSelectedIds = [...selectedDeudaIds];
     setSelectedDeudaIds([]);
     setObservaciones('');
 
@@ -194,6 +222,7 @@ export default function CobranzasPage({
     try {
       await registrarCobranzaAPI({
         nroRecibo: `REC-${nroRecibo}`,
+        nroComprobante: nroTransaccion || '',
         socioId: activeSocio.id,
         cajaId: chosenCaja.id,
         total: totalBs,
@@ -202,6 +231,18 @@ export default function CobranzasPage({
         deudaIds: selectedDeudaIds
       });
     } catch (e) {
+      if (e.code === 'COMPROBANTE_DUPLICADO') {
+        // *** REVERTIR CAMBIOS OPTIMISTAS ***
+        setCurrentReceipt(null);
+        setHistorialRecibos(prev => prev.filter(r => r.nroRecibo !== nroRecibo));
+        setDeudas(prevDeudas);
+        setCajas(prevCajas);
+        setSelectedDeudaIds(prevSelectedIds);
+
+        setAlertMsg(`🚫 COMPROBANTE DUPLICADO: ${e.message}`);
+        setTimeout(() => setAlertMsg(null), 10000);
+        return;
+      }
       console.warn('Error al sincronizar cobranza con backend:', e);
     }
   };

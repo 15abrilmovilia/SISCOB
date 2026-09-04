@@ -683,15 +683,101 @@ app.post('/api/egresos', async (req, res) => {
   res.status(201).json({ id: Date.now(), ...req.body });
 });
 
-// 6. Cobranzas / Recibos Endpoint
+// 6. Recibos y Cobranzas Endpoints
+
+// GET: Listar todos los recibos emitidos
+app.get('/api/recibos', async (req, res) => {
+  if (pool) {
+    try {
+      const { rows } = await pool.query('SELECT * FROM recibos ORDER BY id DESC');
+      const formatted = rows.map(r => ({
+        id: r.id,
+        nroRecibo: r.nro_recibo,
+        socioId: r.socio_id,
+        cajaId: r.caja_id,
+        total: parseFloat(r.total) || 0,
+        metodoPago: r.metodo_pago,
+        cajero: r.cajero,
+        fecha: r.fecha ? r.fecha.toISOString() : ''
+      }));
+      return res.json(formatted);
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json([]);
+});
+
+// GET: Verificar si un comprobante/recibo ya existe
+app.get('/api/recibos/verificar-duplicado', async (req, res) => {
+  const { nroRecibo, nroComprobante } = req.query;
+  if (!nroRecibo && !nroComprobante) {
+    return res.json({ duplicado: false });
+  }
+
+  if (pool) {
+    try {
+      let duplicado = false;
+      let detalle = null;
+
+      if (nroRecibo) {
+        const { rows } = await pool.query(
+          'SELECT id, nro_recibo, socio_id, total, fecha FROM recibos WHERE nro_recibo = $1 OR nro_recibo = $2',
+          [nroRecibo, `REC-${nroRecibo}`]
+        );
+        if (rows.length > 0) {
+          duplicado = true;
+          detalle = rows[0];
+        }
+      }
+
+      return res.json({ duplicado, detalle });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ duplicado: false });
+});
+
+// POST: Registrar cobranza
 app.post('/api/cobranzas', async (req, res) => {
-  const { nroRecibo, socioId, cajaId, total, metodoPago, cajero, deudaIds } = req.body;
+  const { nroRecibo, nroComprobante, socioId, cajaId, total, metodoPago, cajero, deudaIds } = req.body;
   if (!nroRecibo || !total) {
     return res.status(400).json({ error: 'Datos de cobranza incompletos.' });
   }
 
   if (pool) {
     try {
+      // Verificar si el número de recibo ya existe (duplicado)
+      const { rows: existingRecibo } = await pool.query(
+        'SELECT id, nro_recibo, socio_id, total, fecha FROM recibos WHERE nro_recibo = $1 OR nro_recibo = $2',
+        [nroRecibo, `REC-${nroRecibo}`]
+      );
+      if (existingRecibo.length > 0) {
+        const dup = existingRecibo[0];
+        return res.status(409).json({
+          error: 'COMPROBANTE_DUPLICADO',
+          message: `El recibo N° ${nroRecibo} ya fue registrado anteriormente (ID: ${dup.id}, Monto: ${dup.total}, Fecha: ${dup.fecha}).`,
+          reciboExistente: dup
+        });
+      }
+
+      // Verificar si el N° de comprobante/transacción bancaria ya fue usado
+      if (nroComprobante && nroComprobante.trim() !== '') {
+        const { rows: existingComp } = await pool.query(
+          "SELECT id, nro_recibo, socio_id, total, fecha FROM recibos WHERE cajero LIKE $1 OR nro_recibo LIKE $2",
+          [`%${nroComprobante.trim()}%`, `%${nroComprobante.trim()}%`]
+        );
+        if (existingComp.length > 0) {
+          const dup = existingComp[0];
+          return res.status(409).json({
+            error: 'COMPROBANTE_DUPLICADO',
+            message: `El comprobante/transacción "${nroComprobante}" ya fue utilizado en el recibo N° ${dup.nro_recibo} (Monto: ${dup.total}).`,
+            reciboExistente: dup
+          });
+        }
+      }
+
       const query = `
         INSERT INTO recibos (nro_recibo, socio_id, caja_id, total, metodo_pago, cajero)
         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
@@ -708,6 +794,14 @@ app.post('/api/cobranzas', async (req, res) => {
 
       return res.status(201).json({ success: true, recibo: rows[0] });
     } catch (err) {
+      // Capturar error de UNIQUE constraint de PostgreSQL
+      if (err.code === '23505' && err.constraint && err.constraint.includes('recibo')) {
+        return res.status(409).json({
+          error: 'COMPROBANTE_DUPLICADO',
+          message: `El número de recibo "${nroRecibo}" ya existe en la base de datos. No se puede registrar un comprobante duplicado.`,
+          detail: err.detail
+        });
+      }
       console.error('DB Error al registrar cobranza:', err);
       return res.status(500).json({ error: 'Error al registrar cobranza en base de datos.', detail: err.message });
     }

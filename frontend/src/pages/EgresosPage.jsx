@@ -3,7 +3,7 @@ import { TrendingDown, Plus, FileText, Printer, CheckCircle, Search, User, X, Tr
 import VoucherModal from '../components/VoucherModal';
 import { createEgresoAPI, deleteEgresoAPI } from '../utils/api';
 
-export default function EgresosPage({ egresos, setEgresos, cajas, setCajas, socios = [] }) {
+export default function EgresosPage({ egresos, setEgresos, cajas, setCajas, socios = [], currentUser }) {
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   
@@ -90,7 +90,7 @@ export default function EgresosPage({ egresos, setEgresos, cajas, setCajas, soci
       beneficiario: formData.pagadoA.toUpperCase(),
       concepto: formData.descripcion.toUpperCase(),
       monto: montoNum,
-      responsable: 'DANIELA'
+      responsable: currentUser?.nombreCompleto || currentUser?.usuario || 'Sistema'
     };
 
     // Guardar en Supabase a través de Railway
@@ -105,7 +105,7 @@ export default function EgresosPage({ egresos, setEgresos, cajas, setCajas, soci
       moneda: formData.moneda,
       conDocumento: formData.conDocumento.toUpperCase(),
       cajaId: formData.cajaId,
-      usuario: 'DANIELA',
+      usuario: currentUser?.nombreCompleto || currentUser?.usuario || 'Sistema',
       observaciones: formData.observaciones
     };
 
