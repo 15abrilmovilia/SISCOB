@@ -15,7 +15,7 @@ import {
   CheckCircle2,
   FileSpreadsheet
 } from 'lucide-react';
-import { printIsolatedDocument, downloadCSV } from '../utils/printHelper';
+import { printIsolatedDocument, downloadCSV, downloadXLSX } from '../utils/printHelper';
 
 export default function BalancePage({ cajas = [], egresos = [], socios = [], currentUser }) {
   // Period filter states (default: first day of current month to today)
@@ -45,8 +45,8 @@ export default function BalancePage({ cajas = [], egresos = [], socios = [], cur
     return cajas.filter(c => c.id === cajaFilter);
   }, [cajas, cajaFilter]);
 
-  // 1. Export to Excel / CSV
-  const handleExportExcel = () => {
+  // 1. Export to Excel (.xlsx) / CSV (.csv)
+  const handleExportExcel = (formato = 'xlsx') => {
     const headers = [
       'Código Caja', 'Nombre de Caja', 'Saldo Anterior (Bs)', 'Ingresos Registrados (Bs)', 
       'Egresos / Gastos (Bs)', 'Saldo Actual Disponible (Bs)', '% Distribución del Patrimonio', 'Estado'
@@ -60,10 +60,10 @@ export default function BalancePage({ cajas = [], egresos = [], socios = [], cur
       return [
         c.id,
         c.nombre,
-        (parseFloat(c.saldoAnterior) || 0).toFixed(2),
-        (parseFloat(c.ingresos) || 0).toFixed(2),
-        (parseFloat(c.egresos) || 0).toFixed(2),
-        saldo.toFixed(2),
+        Number((parseFloat(c.saldoAnterior) || 0).toFixed(2)),
+        Number((parseFloat(c.ingresos) || 0).toFixed(2)),
+        Number((parseFloat(c.egresos) || 0).toFixed(2)),
+        Number(saldo.toFixed(2)),
         pct,
         'Activa'
       ];
@@ -73,15 +73,20 @@ export default function BalancePage({ cajas = [], egresos = [], socios = [], cur
     rows.push([
       'CONSOLIDADOS',
       'TOTAL GENERAL TODAS LAS CAJAS',
-      totalSaldoAnt.toFixed(2),
-      totalIngresos.toFixed(2),
-      totalEgresos.toFixed(2),
-      totalSaldoActual.toFixed(2),
+      Number(totalSaldoAnt.toFixed(2)),
+      Number(totalIngresos.toFixed(2)),
+      Number(totalEgresos.toFixed(2)),
+      Number(totalSaldoActual.toFixed(2)),
       '100.0%',
       'Cerrado y Conciliado'
     ]);
 
-    downloadCSV(`Balance_General_Cajas_${fechaDesde}_al_${fechaHasta}`, headers, rows);
+    const filename = `Balance_General_Cajas_${fechaDesde}_al_${fechaHasta}`;
+    if (formato === 'csv') {
+      downloadCSV(filename, headers, rows);
+    } else {
+      downloadXLSX(filename, headers, rows, 'Balance_Cajas');
+    }
   };
 
   // 2. Isolated Executive Print for General Assembly / Board
@@ -229,12 +234,20 @@ export default function BalancePage({ cajas = [], egresos = [], socios = [], cur
 
         <div className="flex items-center space-x-2.5">
           <button
-            onClick={handleExportExcel}
+            onClick={() => handleExportExcel('xlsx')}
             className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
-            title="Exportar archivo CSV compatible con Excel"
+            title="Exportar archivo Excel (.xlsx) nativo"
           >
             <Download className="w-4 h-4" />
-            <span>Exportar Excel</span>
+            <span>Excel (.xlsx)</span>
+          </button>
+          <button
+            onClick={() => handleExportExcel('csv')}
+            className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer border border-slate-300 shadow-xs active:scale-95"
+            title="Exportar archivo CSV (.csv) delimitado por punto y coma"
+          >
+            <Download className="w-4 h-4 text-slate-600" />
+            <span>CSV</span>
           </button>
           <button
             onClick={handlePrintAssemblyReport}

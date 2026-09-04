@@ -11,7 +11,7 @@ import {
   Layers,
   Database
 } from 'lucide-react';
-import { printIsolatedDocument, downloadCSV } from '../utils/printHelper';
+import { printIsolatedDocument, downloadCSV, downloadXLSX } from '../utils/printHelper';
 
 // Datos de Ingresos Recaudados Históricos (Fiel a JasperViewer)
 const RAW_INGRESOS = [
@@ -331,8 +331,8 @@ export default function ReportesPage({
   }, [filteredDeudas]);
   const grandTotalDeudas = filteredDeudas.reduce((acc, curr) => acc + (curr.total || 0), 0);
 
-  // 5. EXPORTAR A EXCEL / CSV REAL (Descarga directa con datos reales del sistema)
-  const handleExportExcel = (tipo) => {
+  // 5. EXPORTAR A EXCEL (.xlsx) o CSV (.csv) REAL (Descarga directa con datos reales del sistema)
+  const handleExportExcel = (tipo, formato = 'xlsx') => {
     const isIngresos = tipo === 'Ingresos';
     const list = isIngresos ? filteredIngresos : filteredDeudas;
     const totals = isIngresos ? totalsIngresos : totalsDeudas;
@@ -383,11 +383,12 @@ export default function ReportesPage({
       grandTotal
     ]);
 
-    downloadCSV(
-      `Matriz_${tipo}_${dataSource}_${isIngresos ? fechaDesde + '_' : ''}${fechaHasta}`,
-      headers,
-      rows
-    );
+    const filename = `Matriz_${tipo}_${dataSource}_${isIngresos ? fechaDesde + '_' : ''}${fechaHasta}`;
+    if (formato === 'csv') {
+      downloadCSV(filename, headers, rows);
+    } else {
+      downloadXLSX(filename, headers, rows, `Matriz_${tipo}`);
+    }
   };
 
   // 6. IMPRIMIR VISTA JASPER AISLADA PROFESIONAL (Sin botones ni captura de ventana)
@@ -680,14 +681,22 @@ export default function ReportesPage({
             )}
           </div>
 
-          <div className="flex space-x-2">
+          <div className="flex items-center space-x-2">
             <button
-              onClick={() => handleExportExcel(reportTab === 'recaudados' ? 'Ingresos' : 'Deudas')}
+              onClick={() => handleExportExcel(reportTab === 'recaudados' ? 'Ingresos' : 'Deudas', 'xlsx')}
               className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
-              title="Descargar archivo CSV compatible con Excel"
+              title="Descargar archivo Excel (.xlsx) nativo con columnas autoajustadas"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Exportar Excel (.csv)</span>
+              <span>Exportar Excel (.xlsx)</span>
+            </button>
+            <button
+              onClick={() => handleExportExcel(reportTab === 'recaudados' ? 'Ingresos' : 'Deudas', 'csv')}
+              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border border-slate-300 shadow-xs active:scale-95"
+              title="Descargar archivo CSV delimitado por punto y coma"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-600" />
+              <span>CSV</span>
             </button>
             <button
               onClick={handlePrintJasper}

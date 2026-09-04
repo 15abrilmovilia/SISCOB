@@ -13,6 +13,7 @@ import {
   FileCheck,
   Plus
 } from 'lucide-react';
+import { downloadCSV, downloadXLSX } from '../utils/printHelper';
 
 // Muestra de datos de Agosto simulando una planilla Excel cargada por la directiva
 const SAMPLE_EXCEL_AGOSTO = [
@@ -153,22 +154,20 @@ Los saldos de agosto y las deudas han sido actualizados.`);
   };
 
   // Descarga de Plantilla Oficial
-  const handleDescargarPlantilla = () => {
-    const csvContent = 
-      "Interno,Socio_Nombre,Concepto,Periodo,Monto_Bs,Estado,Caja\n" +
-      "1,SANTIAGO LLANOS,Sostenimiento Mensual,08/2026,400.00,PAGADO,c1\n" +
-      "3,CARLOS MAXI,Sostenimiento Mensual,08/2026,400.00,PAGADO,c1\n" +
-      "7,FERMIN ARELLANO,Mantenimiento GPS,08/2026,80.00,PAGADO,c2\n" +
-      "8,BRAULIO COLQUE,Multa Inasistencia,08/2026,100.00,PENDIENTE,c1";
+  const handleDescargarPlantilla = (formato = 'xlsx') => {
+    const headers = ['Interno', 'Socio_Nombre', 'Concepto', 'Periodo', 'Monto_Bs', 'Estado', 'Caja'];
+    const rows = [
+      ['1', 'SANTIAGO LLANOS', 'Sostenimiento Mensual', '08/2026', 400.00, 'PAGADO', 'c1'],
+      ['3', 'CARLOS MAXI', 'Sostenimiento Mensual', '08/2026', 400.00, 'PAGADO', 'c1'],
+      ['7', 'FERMIN ARELLANO', 'Mantenimiento GPS', '08/2026', 80.00, 'PAGADO', 'c2'],
+      ['8', 'BRAULIO COLQUE', 'Multa Inasistencia', '08/2026', 100.00, 'PENDIENTE', 'c1']
+    ];
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'Plantilla_SISCOB_Migracion_Agosto.csv');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    if (formato === 'csv') {
+      downloadCSV('Plantilla_SISCOB_Migracion_Agosto', headers, rows);
+    } else {
+      downloadXLSX('Plantilla_SISCOB_Migracion_Agosto', headers, rows, 'Plantilla_Agosto');
+    }
   };
 
   // Guardar Entrada Manual Asistida
@@ -250,13 +249,22 @@ Los saldos de agosto y las deudas han sido actualizados.`);
                 <p className="text-slate-500">Sube la planilla de cobranzas o deudas de agosto para validación previa</p>
               </div>
 
-              <div className="flex space-x-2">
+              <div className="flex items-center space-x-2">
                 <button
-                  onClick={handleDescargarPlantilla}
-                  className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl font-bold border border-slate-300 transition cursor-pointer"
+                  onClick={() => handleDescargarPlantilla('xlsx')}
+                  className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
+                  title="Descargar plantilla oficial en formato Excel (.xlsx)"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Descargar Plantilla Oficial (.csv)</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Plantilla Excel (.xlsx)</span>
+                </button>
+                <button
+                  onClick={() => handleDescargarPlantilla('csv')}
+                  className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold border border-slate-300 transition cursor-pointer shadow-xs active:scale-95"
+                  title="Descargar plantilla oficial en formato CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-600" />
+                  <span>CSV</span>
                 </button>
               </div>
             </div>

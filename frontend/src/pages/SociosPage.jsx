@@ -30,6 +30,7 @@ import KardexModal from '../components/KardexModal';
 import CredencialModal from '../components/CredencialModal';
 import EditSocioModal from '../components/EditSocioModal';
 import AsignarCuotaModal from '../components/AsignarCuotaModal';
+import { downloadCSV, downloadXLSX } from '../utils/printHelper';
 
 export default function SociosPage({ 
   socios = [], 
@@ -205,49 +206,47 @@ export default function SociosPage({
     window.open(url, '_blank');
   };
 
-  // Exportar a CSV para Excel
-  const handleExportCSV = () => {
+  // Exportar Padrón a Excel (.xlsx) o CSV (.csv)
+  const handleExportPadron = (formato = 'xlsx') => {
     const headers = [
-      'Movil_ID',
+      'Nro Móvil',
       'Nombres',
-      'ApPaterno',
-      'ApMaterno',
-      'CI',
+      'Apellido Paterno',
+      'Apellido Materno',
+      'Cédula de Identidad',
       'Celular',
-      'Categoria',
-      'Estado_Gremial',
+      'Categoría',
+      'Estado Gremial',
       'Placa',
-      'Vehiculo',
-      'Deuda_Pendiente_Bs',
-      'Antiguedad'
+      'Vehículo',
+      'Deuda Pendiente (Bs)',
+      'Antigüedad'
     ];
     const rows = sortedSocios.map((s) => {
       const deuda = socioDeudasMap[s.id] || 0;
+      const movilStr = s.nroMovil !== undefined && s.nroMovil !== null ? String(s.nroMovil) : String(s.id);
       return [
-        s.id,
-        `"${s.nombres || ''}"`,
-        `"${s.apPaterno || ''}"`,
-        `"${s.apMaterno || ''}"`,
-        `"${s.ci || ''}"`,
-        `"${s.celular || ''}"`,
-        `"${s.categoria || ''}"`,
+        movilStr,
+        s.nombres || '',
+        s.apPaterno || '',
+        s.apMaterno || '',
+        s.ci || '',
+        s.celular || '',
+        s.categoria || '',
         s.estado === 'SUSP' ? 'SUSPENDIDO' : deuda > 0 ? 'EN MORA' : 'AL DÍA',
-        `"${s.placa || ''}"`,
-        `"${s.vehiculo || ''}"`,
-        deuda.toFixed(2),
-        `"${calcularAntiguedad(s.fechaIngreso)}"`
+        s.placa || '',
+        s.vehiculo || '',
+        Number(deuda.toFixed(2)),
+        calcularAntiguedad(s.fechaIngreso)
       ];
     });
 
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Padron_Socios_SISCOB_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const filename = `Padron_Socios_SISCOB_${new Date().toISOString().slice(0, 10)}`;
+    if (formato === 'csv') {
+      downloadCSV(filename, headers, rows);
+    } else {
+      downloadXLSX(filename, headers, rows, 'Padron_Socios');
+    }
   };
 
   // Imprimir nómina oficial
@@ -276,12 +275,21 @@ export default function SociosPage({
         {/* Botones de acción principal */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={handleExportCSV}
-            className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer border border-slate-200"
-            title="Descargar padrón en formato Excel (CSV)"
+            onClick={() => handleExportPadron('xlsx')}
+            className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
+            title="Descargar padrón en formato Excel (.xlsx)"
           >
-            <Download className="w-4 h-4 text-emerald-600" />
-            <span>Exportar Excel</span>
+            <Download className="w-4 h-4" />
+            <span>Excel (.xlsx)</span>
+          </button>
+
+          <button
+            onClick={() => handleExportPadron('csv')}
+            className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer border border-slate-200 shadow-xs active:scale-95"
+            title="Descargar padrón en formato CSV compatible con Excel"
+          >
+            <Download className="w-4 h-4 text-slate-600" />
+            <span>CSV</span>
           </button>
 
           <button

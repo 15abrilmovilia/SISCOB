@@ -367,8 +367,10 @@ export function generateReceiptHTML(receiptData, printMode = 'termico') {
   `;
 }
 
+import * as XLSX from 'xlsx';
+
 /**
- * Exportador de Tablas a CSV / Excel limpio
+ * Exportador de Tablas a CSV limpio (Compatible al 100% con Excel en Español / Windows)
  */
 export function downloadCSV(filename, headers, rows) {
   const escapeCsv = (val) => {
@@ -378,13 +380,15 @@ export function downloadCSV(filename, headers, rows) {
   };
 
   const csvRows = [];
-  csvRows.push(headers.map(escapeCsv).join(','));
+  // Usar ';' (punto y coma) que es el separador de listas estándar de Excel en Windows (Español)
+  csvRows.push(headers.map(escapeCsv).join(';'));
 
   for (const row of rows) {
-    csvRows.push(row.map(escapeCsv).join(','));
+    csvRows.push(row.map(escapeCsv).join(';'));
   }
 
-  const csvContent = '\uFEFF' + csvRows.join('\r\n');
+  // \uFEFF (UTF-8 BOM) + CRLF (\r\n) para que Excel no colapse las filas ni las columnas
+  const csvContent = '\uFEFF' + csvRows.join('\r\n') + '\r\n';
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -393,4 +397,30 @@ export function downloadCSV(filename, headers, rows) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/**
+ * Exportador nativo a archivo Excel (.xlsx) con autoajuste de columnas
+ */
+export function downloadXLSX(filename, headers, rows, sheetName = 'Datos') {
+  const data = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Autoajustar ancho de columnas
+  const colWidths = headers.map((h, i) => {
+    let maxLen = String(h || '').length;
+    for (const r of rows) {
+      if (r[i] !== undefined && r[i] !== null) {
+        maxLen = Math.max(maxLen, String(r[i]).length);
+      }
+    }
+    return { wch: Math.min(Math.max(maxLen + 3, 10), 45) };
+  });
+  ws['!cols'] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `${filename}.xlsx`);
+}
+
