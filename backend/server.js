@@ -65,26 +65,22 @@ async function seedConceptosYDeudas() {
   if (!pool) return;
   try {
     // 1. Sembrar o actualizar catálogo oficial de 8 conceptos
-    const { rows: cRows } = await pool.query('SELECT COUNT(*) as count FROM conceptos');
-    const cCount = parseInt(cRows[0]?.count || '0');
-    if (cCount === 0 || cCount !== CONCEPTOS_OFICIALES.length) {
-      console.log(`[SISCOB Backend] Actualizando catálogo oficial: ${CONCEPTOS_OFICIALES.length} conceptos por caja...`);
-      await pool.query('DELETE FROM conceptos');
-      for (const c of CONCEPTOS_OFICIALES) {
-        await pool.query(`
-          INSERT INTO conceptos (id, nombre, tipo, periodicidad, monto, moneda, activo)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          ON CONFLICT (id) DO UPDATE 
-          SET nombre = EXCLUDED.nombre,
-              tipo = EXCLUDED.tipo,
-              periodicidad = EXCLUDED.periodicidad,
-              monto = EXCLUDED.monto,
-              activo = EXCLUDED.activo
-        `, [c.id, c.nombre, c.tipo, c.periodicidad, c.monto, c.moneda, c.activo]);
-      }
-      await pool.query("SELECT setval('conceptos_id_seq', (SELECT GREATEST(MAX(id), 1) FROM conceptos))").catch(() => {});
-      console.log('[SISCOB Backend] Conceptos oficiales configurados exitosamente.');
+    console.log(`[SISCOB Backend] Sincronizando catálogo oficial: ${CONCEPTOS_OFICIALES.length} conceptos por caja...`);
+    for (const c of CONCEPTOS_OFICIALES) {
+      await pool.query(`
+        INSERT INTO conceptos (id, nombre, tipo, periodicidad, monto, moneda, activo)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (id) DO UPDATE 
+        SET nombre = EXCLUDED.nombre,
+            tipo = EXCLUDED.tipo,
+            periodicidad = EXCLUDED.periodicidad,
+            monto = EXCLUDED.monto,
+            moneda = EXCLUDED.moneda,
+            activo = EXCLUDED.activo
+      `, [c.id, c.nombre, c.tipo, c.periodicidad, c.monto, c.moneda, c.activo]);
     }
+    await pool.query("SELECT setval('conceptos_id_seq', (SELECT GREATEST(MAX(id), 1) FROM conceptos))").catch(() => {});
+    console.log('[SISCOB Backend] Conceptos oficiales configurados exitosamente.');
 
     // 2. Generar las 206 cuotas de frecuencia mensual (200 Bs) si deudas_socio está vacía
     const { rows: dRows } = await pool.query('SELECT COUNT(*) as count FROM deudas_socio');
@@ -183,7 +179,6 @@ app.get('/api/conceptos', async (req, res) => {
 app.post('/api/conceptos/reset', async (req, res) => {
   if (pool) {
     try {
-      await pool.query('DELETE FROM conceptos');
       for (const c of CONCEPTOS_OFICIALES) {
         await pool.query(`
           INSERT INTO conceptos (id, nombre, tipo, periodicidad, monto, moneda, activo)
@@ -193,9 +188,11 @@ app.post('/api/conceptos/reset', async (req, res) => {
               tipo = EXCLUDED.tipo,
               periodicidad = EXCLUDED.periodicidad,
               monto = EXCLUDED.monto,
+              moneda = EXCLUDED.moneda,
               activo = EXCLUDED.activo
         `, [c.id, c.nombre, c.tipo, c.periodicidad, c.monto, c.moneda, c.activo]);
       }
+      await pool.query("SELECT setval('conceptos_id_seq', (SELECT GREATEST(MAX(id), 1) FROM conceptos))").catch(() => {});
       return res.json({ success: true, count: CONCEPTOS_OFICIALES.length, message: 'Conceptos oficiales actualizados en Supabase.' });
     } catch (err) {
       return res.status(500).json({ error: err.message });
