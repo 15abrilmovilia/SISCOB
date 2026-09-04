@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "cajaId": "c1",
+    "cajaNombre": "CAJA DE FRECUENCIA",
+    "nombre": "CUOTA FRECUENCIA MENSUAL SOCIOS",
+    "tipo": "Mensualidad",
+    "monto": 200.0,
+    "periodicidad": "Mensual",
+    "moneda": "Bs",
+    "activo": true,
+    "descripcion": "Aporte mensual ordinario de frecuencia para socios propietarios (Generación mensual obligatoria)"
+  },
+  {
+    "id": 2,
+    "cajaId": "c2",
+    "cajaNombre": "CAJA DE MULTAS E INFRACCIONES",
+    "nombre": "MULTA POR NO HACER TURNO",
+    "tipo": "Multa",
+    "monto": 20.0,
+    "periodicidad": "Variable",
+    "moneda": "Bs",
+    "activo": true,
+    "descripcion": "Sanción por incumplimiento de turno reglamentario"
+  },
+  {
+    "id": 3,
+    "cajaId": "c2",
+    "cajaNombre": "CAJA DE MULTAS E INFRACCIONES",
+    "nombre": "MULTA ARTÍCULO 5",
+    "tipo": "Multa",
+    "monto": 5.0,
+    "periodicidad": "Variable",
+    "moneda": "Bs",
+    "activo": true,
+    "descripcion": "Costo de sanción conforme al Artículo 5 del reglamento interno"
+  },
+  {
+    "id": 4,
+    "cajaId": "c2",
+    "cajaNombre": "CAJA DE MULTAS E INFRACCIONES",
+    "nombre": "DENUNCIA POR MENTIR UBICACIÓN",
+    "tipo": "Multa",
+    "monto": 20.0,
+    "periodicidad": "Variable",
+    "moneda": "Bs",
+    "activo": true,
+    "descripcion": "Sanción disciplinaria por falsear ubicación de la unidad"
+  },
+  {
+    "id": 5,
+    "cajaId": "c2",
+    "cajaNombre": "CAJA DE MULTAS E INFRACCIONES",
+    "nombre": "NO CUMPLIR TURNO EN DOMINGO Y FERIADO",
+    "tipo": "Multa",
+    "monto": 40.0,
+    "periodicidad": "Variable",
+    "moneda": "Bs",
+    "activo": true,
+    "descripcion": "Sanción agravada por inasistencia a turnos en domingos o días feriados"
+  },
+  {
+    "id": 6,
+    "cajaId": "c3",
+    "cajaNombre": "CAJA NUEVOS SOCIOS",
+    "nombre": "PAGO DE NUEVOS SOCIOS",
+    "tipo": "Inscripción",
+    "monto": 500.0,
+    "periodicidad": "Única",
+    "moneda": "Bs",
+    "activo": true,
+    "descripcion": "Cuota de ingreso, aportación y registro de nuevo socio afiliado"
+  },
+  {
+    "id": 7,
+    "cajaId": "c4",
+    "cajaNombre": "CAJA PRÉSTAMOS",
+    "nombre": "AMORTIZACIÓN DE PRÉSTAMO INTERNO",
+    "tipo": "Amortización",
+    "monto": 0.0,
+    "periodicidad": "Mensual",
+    "moneda": "Bs",
+    "activo": true,
+    "descripcion": "Cobro de cuota mensual y capital de préstamo otorgado a socios"
+  },
+  {
+    "id": 8,
+    "cajaId": "c5",
+    "cajaNombre": "CAJA FRECUENCIA INQUILINOS",
+    "nombre": "FRECUENCIA DE CONDUCTORES INQUILINOS",
+    "tipo": "Mensualidad",
+    "monto": 250.0,
+    "periodicidad": "Mensual",
+    "moneda": "Bs",
+    "activo": true,
+    "descripcion": "Cuota mensual por derecho de frecuencia para conductores inquilinos y relevos"
+  }
+]

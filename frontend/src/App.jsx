@@ -66,7 +66,13 @@ export default function App() {
     }
     return loaded;
   });
-  const [deudas, setDeudas] = useState(() => loadFromStorage(STORAGE_KEYS.DEUDAS, INITIAL_DEUDAS));
+  const [deudas, setDeudas] = useState(() => {
+    const loaded = loadFromStorage(STORAGE_KEYS.DEUDAS, null);
+    if (!loaded || !Array.isArray(loaded) || loaded.length === 0) {
+      return INITIAL_DEUDAS;
+    }
+    return loaded;
+  });
   const [cajas, setCajas] = useState(() => {
     const loaded = loadFromStorage(STORAGE_KEYS.CAJAS, null);
     if (!loaded || !Array.isArray(loaded) || loaded.length !== 5 || loaded[0]?.nombre === 'CAJA GENERAL') {
@@ -103,7 +109,7 @@ export default function App() {
         ]);
         if (Array.isArray(cloudSocios) && cloudSocios.length > 0) setSocios(cloudSocios);
         if (Array.isArray(cloudCajas) && cloudCajas.length > 0) setCajas(cloudCajas);
-        if (Array.isArray(cloudDeudas)) setDeudas(cloudDeudas);
+        if (Array.isArray(cloudDeudas) && cloudDeudas.length > 0) setDeudas(cloudDeudas);
         if (Array.isArray(cloudEgresos)) setEgresos(cloudEgresos);
         if (Array.isArray(cloudUsuarios) && cloudUsuarios.length > 0) setUsuarios(cloudUsuarios);
       } catch (err) {

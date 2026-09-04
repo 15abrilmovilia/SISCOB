@@ -11,6 +11,8 @@ app.use(express.json());
 // Check if PostgreSQL is configured via DATABASE_URL
 let pool = null;
 const NOMINA_206_SOCIOS = require('./socios_nomina_206.json');
+const CONCEPTOS_OFICIALES = require('./conceptos_oficiales.json');
+const DEUDAS_SEPTIEMBRE_206 = require('./deudas_septiembre_206.json');
 
 async function seedSociosIfEmpty() {
   if (!pool) return;
@@ -59,6 +61,50 @@ async function seedSociosIfEmpty() {
   }
 }
 
+async function seedConceptosYDeudas() {
+  if (!pool) return;
+  try {
+    // 1. Sembrar o actualizar catálogo oficial de 8 conceptos
+    const { rows: cRows } = await pool.query('SELECT COUNT(*) as count FROM conceptos');
+    const cCount = parseInt(cRows[0]?.count || '0');
+    if (cCount === 0 || cCount !== CONCEPTOS_OFICIALES.length) {
+      console.log(`[SISCOB Backend] Actualizando catálogo oficial: ${CONCEPTOS_OFICIALES.length} conceptos por caja...`);
+      await pool.query('DELETE FROM conceptos');
+      for (const c of CONCEPTOS_OFICIALES) {
+        await pool.query(`
+          INSERT INTO conceptos (id, nombre, tipo, periodicidad, monto, moneda, activo)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (id) DO UPDATE 
+          SET nombre = EXCLUDED.nombre,
+              tipo = EXCLUDED.tipo,
+              periodicidad = EXCLUDED.periodicidad,
+              monto = EXCLUDED.monto,
+              activo = EXCLUDED.activo
+        `, [c.id, c.nombre, c.tipo, c.periodicidad, c.monto, c.moneda, c.activo]);
+      }
+      await pool.query("SELECT setval('conceptos_id_seq', (SELECT GREATEST(MAX(id), 1) FROM conceptos))").catch(() => {});
+      console.log('[SISCOB Backend] Conceptos oficiales configurados exitosamente.');
+    }
+
+    // 2. Generar las 206 cuotas de frecuencia mensual (200 Bs) si deudas_socio está vacía
+    const { rows: dRows } = await pool.query('SELECT COUNT(*) as count FROM deudas_socio');
+    const dCount = parseInt(dRows[0]?.count || '0');
+    if (dCount === 0) {
+      console.log(`[SISCOB Backend] Generando ${DEUDAS_SEPTIEMBRE_206.length} cuotas de frecuencia mensual (200 Bs)...`);
+      for (const d of DEUDAS_SEPTIEMBRE_206) {
+        await pool.query(`
+          INSERT INTO deudas_socio (socio_id, concepto_id, descripcion, periodo, monto, pagado, fecha_vencimiento)
+          VALUES ($1, $2, $3, $4, $5, false, $6)
+        `, [d.socioId, 1, d.descripcion, d.periodo, d.monto, d.fechaVencimiento]);
+      }
+      await pool.query("SELECT setval('deudas_socio_id_seq', (SELECT GREATEST(MAX(id), 1) FROM deudas_socio))").catch(() => {});
+      console.log(`[SISCOB Backend] ¡${DEUDAS_SEPTIEMBRE_206.length} cuotas de 200 Bs generadas en Supabase! (Total: Bs 41,200.00).`);
+    }
+  } catch (err) {
+    console.error('[SISCOB Backend] Error al sembrar conceptos o deudas:', err.message);
+  }
+}
+
 if (process.env.DATABASE_URL) {
   const { Pool } = require('pg');
   pool = new Pool({
@@ -66,7 +112,10 @@ if (process.env.DATABASE_URL) {
     ssl: { rejectUnauthorized: false }
   });
   console.log('[SISCOB Backend] Conexión a PostgreSQL (Supabase) configurada.');
-  seedSociosIfEmpty();
+  (async () => {
+    await seedSociosIfEmpty();
+    await seedConceptosYDeudas();
+  })();
 } else {
   console.log('[SISCOB Backend] Modo desarrollo local activo (sin base de datos remota conectada aún).');
 }
@@ -76,11 +125,19 @@ app.get('/api/health', async (req, res) => {
   let dbOk = false;
   let dbError = null;
   let totalSocios = 0;
+  let totalConceptos = 0;
+  let totalDeudas = 0;
   if (pool) {
     try {
-      const { rows } = await pool.query('SELECT COUNT(*) as count FROM socios');
+      const [sRes, cRes, dRes] = await Promise.all([
+        pool.query('SELECT COUNT(*) as count FROM socios'),
+        pool.query('SELECT COUNT(*) as count FROM conceptos'),
+        pool.query('SELECT COUNT(*) as count FROM deudas_socio')
+      ]);
       dbOk = true;
-      totalSocios = parseInt(rows[0]?.count || '0');
+      totalSocios = parseInt(sRes.rows[0]?.count || '0');
+      totalConceptos = parseInt(cRes.rows[0]?.count || '0');
+      totalDeudas = parseInt(dRes.rows[0]?.count || '0');
     } catch (err) {
       dbError = err.message;
     }
@@ -89,13 +146,81 @@ app.get('/api/health', async (req, res) => {
   res.json({
     status: 'online',
     sistema: 'SISCOB - Radio Móvil 15 de Abril',
-    version: '1.1.0',
+    version: '1.2.0',
     db_configured: !!pool,
     db_connected: dbOk,
     total_socios: totalSocios,
+    total_conceptos: totalConceptos,
+    total_deudas: totalDeudas,
     db_error: dbError,
     timestamp: new Date().toISOString()
   });
+});
+
+// 1.1 Catálogo Oficial de Conceptos Económicos
+app.get('/api/conceptos', async (req, res) => {
+  if (pool) {
+    try {
+      const { rows } = await pool.query('SELECT * FROM conceptos ORDER BY id ASC');
+      if (rows.length > 0) {
+        return res.json(rows.map(c => ({
+          id: c.id,
+          nombre: c.nombre,
+          tipo: c.tipo,
+          periodicidad: c.periodicidad,
+          monto: parseFloat(c.monto) || 0,
+          moneda: c.moneda,
+          activo: c.activo
+        })));
+      }
+    } catch (err) {
+      console.warn('DB Error conceptos:', err.message);
+    }
+  }
+  res.json(CONCEPTOS_OFICIALES);
+});
+
+app.post('/api/conceptos/reset', async (req, res) => {
+  if (pool) {
+    try {
+      await pool.query('DELETE FROM conceptos');
+      for (const c of CONCEPTOS_OFICIALES) {
+        await pool.query(`
+          INSERT INTO conceptos (id, nombre, tipo, periodicidad, monto, moneda, activo)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (id) DO UPDATE 
+          SET nombre = EXCLUDED.nombre,
+              tipo = EXCLUDED.tipo,
+              periodicidad = EXCLUDED.periodicidad,
+              monto = EXCLUDED.monto,
+              activo = EXCLUDED.activo
+        `, [c.id, c.nombre, c.tipo, c.periodicidad, c.monto, c.moneda, c.activo]);
+      }
+      return res.json({ success: true, count: CONCEPTOS_OFICIALES.length, message: 'Conceptos oficiales actualizados en Supabase.' });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true, count: CONCEPTOS_OFICIALES.length });
+});
+
+// 1.2 Generar Cuota Mensual Frecuencia (200 Bs a todos los móviles)
+app.post('/api/deudas/generar-mensual', async (req, res) => {
+  if (pool) {
+    try {
+      await pool.query('DELETE FROM deudas_socio WHERE descripcion LIKE $1', ['%Cuota Frecuencia Mensual%']);
+      for (const d of DEUDAS_SEPTIEMBRE_206) {
+        await pool.query(`
+          INSERT INTO deudas_socio (socio_id, concepto_id, descripcion, periodo, monto, pagado, fecha_vencimiento)
+          VALUES ($1, $2, $3, $4, $5, false, $6)
+        `, [d.socioId, 1, d.descripcion, d.periodo, d.monto, d.fechaVencimiento]);
+      }
+      return res.json({ success: true, count: DEUDAS_SEPTIEMBRE_206.length, total: DEUDAS_SEPTIEMBRE_206.length * 200, message: '206 cuotas de frecuencia mensual generadas.' });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true, count: DEUDAS_SEPTIEMBRE_206.length, total: DEUDAS_SEPTIEMBRE_206.length * 200 });
 });
 
 // 2. Socios Endpoints (CRUD)

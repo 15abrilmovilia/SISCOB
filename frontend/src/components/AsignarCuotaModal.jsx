@@ -3,17 +3,17 @@ import { X, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { createDeudaAPI } from '../utils/api';
 
 const CONCEPTOS_RAPIDOS = [
-  { nombre: 'MULTA POR INASISTENCIA A ASAMBLEA', monto: 100, tipo: 'Multa' },
-  { nombre: 'MULTA POR INASISTENCIA A REUNIÓN ORDINARIA', monto: 50, tipo: 'Multa' },
-  { nombre: 'MULTA POR FALTA A MARCHA / PARO', monto: 50, tipo: 'Multa' },
-  { nombre: 'CUOTA SOSTENIMIENTO MENSUAL', monto: 400, tipo: 'Cobro' },
-  { nombre: 'MANTENIMIENTO GPS MENSUAL', monto: 80, tipo: 'Cobro' },
-  { nombre: 'APORTE EXTRAORDINARIO PRO-SEDE', monto: 20, tipo: 'Extraordinario' },
-  { nombre: 'PAGO DE FRECUENCIA MENSUAL', monto: 200, tipo: 'Cobro' }
+  { nombre: 'MULTA POR NO HACER TURNO', monto: 20, tipo: 'Multa' },
+  { nombre: 'MULTA ARTÍCULO 5', monto: 5, tipo: 'Multa' },
+  { nombre: 'DENUNCIA POR MENTIR UBICACIÓN', monto: 20, tipo: 'Multa' },
+  { nombre: 'NO CUMPLIR TURNO EN DOMINGO Y FERIADO', monto: 40, tipo: 'Multa' },
+  { nombre: 'CUOTA FRECUENCIA MENSUAL SOCIOS', monto: 200, tipo: 'Cobro' },
+  { nombre: 'PAGO DE NUEVOS SOCIOS', monto: 500, tipo: 'Cobro' },
+  { nombre: 'FRECUENCIA DE CONDUCTORES INQUILINOS', monto: 250, tipo: 'Cobro' }
 ];
 
 export default function AsignarCuotaModal({ isOpen, onClose, socio, socios = [], setDeudas }) {
-  const [selectedSocioId, setSelectedSocioId] = useState(socio?.id || (socios[0]?.id || ''));
+  const [selectedSocioId, setSelectedSocioId] = useState(socio?.id ?? (socios[0]?.id ?? 0));
   const [formData, setFormData] = useState({
     tipo: 'Multa',
     descripcion: '',
@@ -121,7 +121,7 @@ export default function AsignarCuotaModal({ isOpen, onClose, socio, socios = [],
             >
               {socios.map(s => (
                 <option key={s.id} value={s.id}>
-                  Móvil #{s.id} — {s.nombres} {s.apPaterno} {s.apMaterno || ''} (CI: {s.ci})
+                  Móvil #{s.nroMovil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : s.id)} — {s.nombres} {s.apPaterno} {s.apMaterno || ''} (CI: {s.ci})
                 </option>
               ))}
             </select>

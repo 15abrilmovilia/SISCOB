@@ -118,9 +118,9 @@ export default function CobranzasPage({
   useEffect(() => {
     if (selectedItems.length > 0) {
       const desc = (selectedItems[0].descripcion || '').toUpperCase();
-      if (desc.includes('MULTA') || desc.includes('INFRAC') || desc.includes('ASAMBLEA') || desc.includes('MARCHA') || desc.includes('SANCION')) {
+      if (desc.includes('MULTA') || desc.includes('INFRAC') || desc.includes('TURNO') || desc.includes('ARTICULO') || desc.includes('ARTÍCULO') || desc.includes('UBICACION') || desc.includes('UBICACIÓN') || desc.includes('DOMINGO') || desc.includes('FERIADO') || desc.includes('SANCION') || desc.includes('DENUNCIA')) {
         setSelectedCajaId('c2'); // CAJA DE MULTAS E INFRACCIONES
-      } else if (desc.includes('PRESTAMO') || desc.includes('CREDITO') || desc.includes('INTERES') || desc.includes('AMORTIZ')) {
+      } else if (desc.includes('PRESTAMO') || desc.includes('PRÉSTAMO') || desc.includes('CREDITO') || desc.includes('INTERES') || desc.includes('AMORTIZ')) {
         setSelectedCajaId('c4'); // CAJA PRÉSTAMOS
       } else if (desc.includes('NUEVO') || desc.includes('INGRESO') || desc.includes('ACCION') || desc.includes('INSCRIPCION')) {
         setSelectedCajaId('c3'); // CAJA NUEVOS SOCIOS

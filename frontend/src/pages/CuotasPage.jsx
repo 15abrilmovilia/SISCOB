@@ -11,11 +11,14 @@ import { loadFromStorage, saveToStorage } from '../utils/storage';
 import AsignarCuotaModal from '../components/AsignarCuotaModal';
 
 const INITIAL_CONCEPTOS = [
-  { id: 'c1', nombre: 'SOSTENIMIENTO MENSUAL RADIO', tipo: 'Mensualidad', monto: 400.0, periodicidad: 'Mensual', sociosAfectados: 180 },
-  { id: 'c2', nombre: 'MANTENIMIENTO GPS TRIMESTRAL', tipo: 'Servicio', monto: 80.0, periodicidad: 'Mensual', sociosAfectados: 165 },
-  { id: 'c3', nombre: 'FALTA A ASAMBLEA GENERAL', tipo: 'Multa', monto: 100.0, periodicidad: 'Variable', sociosAfectados: 18 },
-  { id: 'c4', nombre: 'RIFA ANIVERSARIO 15 DE ABRIL', tipo: 'Extraordinaria', monto: 20.0, periodicidad: 'Única', sociosAfectados: 195 },
-  { id: 'c5', nombre: 'APORTE PRO-SEDE CENTRAL', tipo: 'Aporte', monto: 50.0, periodicidad: 'Mensual', sociosAfectados: 180 }
+  { id: 'con-1', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'CUOTA FRECUENCIA MENSUAL SOCIOS', tipo: 'Mensualidad', monto: 200.0, periodicidad: 'Mensual', sociosAfectados: 206, descripcion: 'Se genera cada mes a todos los números móvil' },
+  { id: 'con-2', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'MULTA POR NO HACER TURNO', tipo: 'Multa', monto: 20.0, periodicidad: 'Variable', sociosAfectados: 0, descripcion: 'Sanción reglamentaria por no cumplir turno' },
+  { id: 'con-3', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'MULTA ARTÍCULO 5', tipo: 'Multa', monto: 5.0, periodicidad: 'Variable', sociosAfectados: 0, descripcion: 'Infracción según Artículo 5' },
+  { id: 'con-4', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'DENUNCIA POR MENTIR UBICACIÓN', tipo: 'Multa', monto: 20.0, periodicidad: 'Variable', sociosAfectados: 0, descripcion: 'Sanción disciplinaria por falsear ubicación' },
+  { id: 'con-5', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'NO CUMPLIR TURNO EN DOMINGO Y FERIADO', tipo: 'Multa', monto: 40.0, periodicidad: 'Variable', sociosAfectados: 0, descripcion: 'Inasistencia a turno en domingos o feriados' },
+  { id: 'con-6', cajaId: 'c3', cajaNombre: 'CAJA NUEVOS SOCIOS', nombre: 'PAGO DE NUEVOS SOCIOS', tipo: 'Inscripción', monto: 500.0, periodicidad: 'Única', sociosAfectados: 0, descripcion: 'Cuota de aportación e ingreso nuevo afiliado' },
+  { id: 'con-7', cajaId: 'c4', cajaNombre: 'CAJA PRÉSTAMOS', nombre: 'PRÉSTAMOS (INGRESOS Y EGRESOS)', tipo: 'Amortización', monto: 0.0, periodicidad: 'Mensual', sociosAfectados: 0, descripcion: 'Créditos internos: amortizaciones y desembolsos' },
+  { id: 'con-8', cajaId: 'c5', cajaNombre: 'CAJA FRECUENCIA INQUILINOS', nombre: 'FRECUENCIA DE CONDUCTORES INQUILINOS', tipo: 'Mensualidad', monto: 250.0, periodicidad: 'Mensual', sociosAfectados: 0, descripcion: 'Uso de frecuencia conductores relevos/inquilinos' }
 ];
 
 export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
@@ -23,9 +26,13 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
   const [isIndividualModalOpen, setIsIndividualModalOpen] = useState(false);
   
   // Conceptos vigentes con persistencia
-  const [conceptos, setConceptos] = useState(() => 
-    loadFromStorage('siscob_conceptos', INITIAL_CONCEPTOS)
-  );
+  const [conceptos, setConceptos] = useState(() => {
+    const loaded = loadFromStorage('siscob_conceptos', null);
+    if (!loaded || !Array.isArray(loaded) || loaded.length !== INITIAL_CONCEPTOS.length || loaded[0]?.monto === 400) {
+      return INITIAL_CONCEPTOS;
+    }
+    return loaded;
+  });
 
   useEffect(() => {
     saveToStorage('siscob_conceptos', conceptos);
@@ -291,6 +298,7 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
             <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
               <tr>
                 <th className="p-3">Concepto / Cuota</th>
+                <th className="p-3">Caja Destino</th>
                 <th className="p-3">Tipo</th>
                 <th className="p-3">Periodicidad</th>
                 <th className="p-3 text-right">Monto (Bs)</th>
@@ -301,7 +309,15 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
             <tbody className="divide-y divide-slate-100 font-sans">
               {conceptos.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50 transition">
-                  <td className="p-3 font-bold text-slate-900 uppercase">{c.nombre}</td>
+                  <td className="p-3">
+                    <div className="font-bold text-slate-900 uppercase">{c.nombre}</div>
+                    {c.descripcion && <div className="text-[10px] text-slate-400 font-medium">{c.descripcion}</div>}
+                  </td>
+                  <td className="p-3">
+                    <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-blue-50 text-blue-800 border border-blue-200">
+                      {c.cajaNombre || (c.cajaId === 'c1' ? 'CAJA DE FRECUENCIA' : (c.cajaId === 'c2' ? 'CAJA MULTAS' : (c.cajaId === 'c3' ? 'CAJA NUEVOS' : (c.cajaId === 'c4' ? 'CAJA PRÉSTAMOS' : 'CAJA INQUILINOS'))))}
+                    </span>
+                  </td>
                   <td className="p-3">
                     <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
                       c.tipo === 'Multa'
@@ -312,8 +328,12 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
                     </span>
                   </td>
                   <td className="p-3 text-slate-600">{c.periodicidad}</td>
-                  <td className="p-3 font-mono font-bold text-right text-slate-900">Bs {c.monto.toFixed(2)}</td>
-                  <td className="p-3 text-center font-mono font-bold text-blue-700">{c.sociosAfectados} socios</td>
+                  <td className="p-3 font-mono font-bold text-right text-slate-900">
+                    {c.monto > 0 ? `Bs ${c.monto.toFixed(2)}` : 'Variable'}
+                  </td>
+                  <td className="p-3 text-center font-mono font-bold text-blue-700">
+                    {c.sociosAfectados > 0 ? `${c.sociosAfectados} móviles` : 'A demanda'}
+                  </td>
                   <td className="p-3 text-center">
                     <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold">
                       ACTIVO
