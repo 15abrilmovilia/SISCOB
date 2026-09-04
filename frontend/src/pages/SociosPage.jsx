@@ -125,7 +125,8 @@ export default function SociosPage({
       const deuda = socioDeudasMap[s.id] || 0;
 
       // 1. Búsqueda por texto (móvil, nombre, CI, teléfono, placa, vehículo)
-      const searchStr = `${s.id} ${s.nombres} ${s.apPaterno} ${s.apMaterno} ${s.ci} ${s.celular || ''} ${s.placa || ''} ${s.vehiculo || ''}`.toLowerCase();
+      const movilDisplay = s.nroMovil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : `${s.id}`);
+      const searchStr = `${movilDisplay} ${s.id} ${s.nombres} ${s.apPaterno} ${s.apMaterno} ${s.ci} ${s.celular || ''} ${s.placa || ''} ${s.vehiculo || ''}`.toLowerCase();
       const matchesSearch = searchStr.includes(searchTerm.toLowerCase());
 
       // 2. Categoría
@@ -550,7 +551,7 @@ export default function SociosPage({
                       {/* Móvil */}
                       <td className="py-3 px-3.5 text-center">
                         <span className="inline-flex items-center justify-center font-mono font-black text-xs px-2 py-1 rounded-xl bg-slate-900 text-white shadow-xs">
-                          #{s.id}
+                          #{s.nroMovil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : s.id)}
                         </span>
                       </td>
 

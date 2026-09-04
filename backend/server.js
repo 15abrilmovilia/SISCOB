@@ -10,6 +10,55 @@ app.use(express.json());
 
 // Check if PostgreSQL is configured via DATABASE_URL
 let pool = null;
+const NOMINA_206_SOCIOS = require('./socios_nomina_206.json');
+
+async function seedSociosIfEmpty() {
+  if (!pool) return;
+  try {
+    await pool.query('ALTER TABLE socios ADD COLUMN IF NOT EXISTS nro_movil VARCHAR(20)');
+    const { rows } = await pool.query('SELECT COUNT(*) as count FROM socios');
+    const count = parseInt(rows[0]?.count || '0');
+    if (count === 0) {
+      console.log(`[SISCOB Backend] Base de datos vacía. Sembrando automáticamente los ${NOMINA_206_SOCIOS.length} socios de la nómina oficial...`);
+      for (const s of NOMINA_206_SOCIOS) {
+        await pool.query(`
+          INSERT INTO socios (id, nro_movil, nombres, ap_paterno, ap_materno, ci, celular, fecha_ingreso, estado, categoria, observaciones)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (id) DO UPDATE 
+          SET nro_movil = EXCLUDED.nro_movil,
+              nombres = EXCLUDED.nombres,
+              ap_paterno = EXCLUDED.ap_paterno,
+              ap_materno = EXCLUDED.ap_materno,
+              ci = EXCLUDED.ci,
+              celular = EXCLUDED.celular,
+              fecha_ingreso = EXCLUDED.fecha_ingreso,
+              estado = EXCLUDED.estado,
+              categoria = EXCLUDED.categoria,
+              observaciones = EXCLUDED.observaciones
+        `, [
+          s.id,
+          s.nroMovil,
+          s.nombres,
+          s.apPaterno,
+          s.apMaterno || '',
+          s.ci || `S/C-${s.nroMovil}`,
+          s.celular || '',
+          s.fechaIngreso || new Date().toISOString().slice(0, 10),
+          s.estado || 'VIG',
+          s.categoria || 'Propietario',
+          s.observaciones || ''
+        ]);
+      }
+      await pool.query("SELECT setval('socios_id_seq', (SELECT GREATEST(MAX(id), 1) FROM socios))");
+      console.log(`[SISCOB Backend] ¡${NOMINA_206_SOCIOS.length} socios propietarios sembrados con éxito!`);
+    } else {
+      console.log(`[SISCOB Backend] Padrón de socios ya cuenta con ${count} registros.`);
+    }
+  } catch (err) {
+    console.error('[SISCOB Backend] Error al verificar o sembrar socios:', err.message);
+  }
+}
+
 if (process.env.DATABASE_URL) {
   const { Pool } = require('pg');
   pool = new Pool({
@@ -17,6 +66,7 @@ if (process.env.DATABASE_URL) {
     ssl: { rejectUnauthorized: false }
   });
   console.log('[SISCOB Backend] Conexión a PostgreSQL (Supabase) configurada.');
+  seedSociosIfEmpty();
 } else {
   console.log('[SISCOB Backend] Modo desarrollo local activo (sin base de datos remota conectada aún).');
 }
@@ -25,10 +75,12 @@ if (process.env.DATABASE_URL) {
 app.get('/api/health', async (req, res) => {
   let dbOk = false;
   let dbError = null;
+  let totalSocios = 0;
   if (pool) {
     try {
-      await pool.query('SELECT 1');
+      const { rows } = await pool.query('SELECT COUNT(*) as count FROM socios');
       dbOk = true;
+      totalSocios = parseInt(rows[0]?.count || '0');
     } catch (err) {
       dbError = err.message;
     }
@@ -37,9 +89,10 @@ app.get('/api/health', async (req, res) => {
   res.json({
     status: 'online',
     sistema: 'SISCOB - Radio Móvil 15 de Abril',
-    version: '1.0.0',
+    version: '1.1.0',
     db_configured: !!pool,
     db_connected: dbOk,
+    total_socios: totalSocios,
     db_error: dbError,
     timestamp: new Date().toISOString()
   });
@@ -51,60 +104,195 @@ app.get('/api/socios', async (req, res) => {
     try {
       const { rows } = await pool.query('SELECT * FROM socios ORDER BY id ASC');
       // Format to match frontend camelCase
-      const formatted = rows.map(s => ({
-        id: s.id,
-        nombres: s.nombres,
-        apPaterno: s.ap_paterno,
-        apMaterno: s.ap_materno,
-        ci: s.ci,
-        celular: s.celular,
-        fechaIngreso: s.fecha_ingreso ? s.fecha_ingreso.toISOString().slice(0, 10) : '',
-        estado: s.estado,
-        categoria: s.categoria,
-        observaciones: s.observaciones,
-        acciones: [{ id: `10${s.id}`, fecha: s.fecha_ingreso, monto: 0.0, estado: s.estado, categoria: s.categoria }],
-        obligaciones: [
-          { nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" },
-          { nombre: "Mantenimiento GPS", monto: 80.0, periodicidad: "Mensual" }
-        ]
-      }));
+      const formatted = rows.map(s => {
+        const movilStr = s.nro_movil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : `${s.id}`);
+        return {
+          id: s.id,
+          nroMovil: movilStr,
+          nombres: s.nombres,
+          apPaterno: s.ap_paterno,
+          apMaterno: s.ap_materno,
+          ci: s.ci,
+          celular: s.celular,
+          fechaIngreso: s.fecha_ingreso ? s.fecha_ingreso.toISOString().slice(0, 10) : '',
+          estado: s.estado,
+          categoria: s.categoria,
+          observaciones: s.observaciones,
+          acciones: [{ id: `ACC-${movilStr}`, fecha: s.fecha_ingreso, monto: 0.0, estado: s.estado, categoria: s.categoria }],
+          obligaciones: [
+            { nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" },
+            { nombre: "Mantenimiento GPS", monto: 80.0, periodicidad: "Mensual" }
+          ]
+        };
+      });
       return res.json(formatted);
     } catch (err) {
       console.error('DB Error socios:', err);
       return res.status(500).json({ error: 'Error al consultar socios en base de datos.', message: err.message });
     }
   }
-  res.json([]);
+  res.json(NOMINA_206_SOCIOS);
+});
+
+// Endpoint explícito para cargar/recargar la nómina oficial de 206 socios propietarios
+app.post('/api/socios/cargar-nomina-propietarios', async (req, res) => {
+  if (pool) {
+    try {
+      await pool.query('ALTER TABLE socios ADD COLUMN IF NOT EXISTS nro_movil VARCHAR(20)');
+      for (const s of NOMINA_206_SOCIOS) {
+        await pool.query(`
+          INSERT INTO socios (id, nro_movil, nombres, ap_paterno, ap_materno, ci, celular, fecha_ingreso, estado, categoria, observaciones)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (id) DO UPDATE 
+          SET nro_movil = EXCLUDED.nro_movil,
+              nombres = EXCLUDED.nombres,
+              ap_paterno = EXCLUDED.ap_paterno,
+              ap_materno = EXCLUDED.ap_materno,
+              ci = EXCLUDED.ci,
+              celular = EXCLUDED.celular,
+              fecha_ingreso = EXCLUDED.fecha_ingreso,
+              estado = EXCLUDED.estado,
+              categoria = EXCLUDED.categoria,
+              observaciones = EXCLUDED.observaciones
+        `, [
+          s.id,
+          s.nroMovil,
+          s.nombres,
+          s.apPaterno,
+          s.apMaterno || '',
+          s.ci || `S/C-${s.nroMovil}`,
+          s.celular || '',
+          s.fechaIngreso || new Date().toISOString().slice(0, 10),
+          s.estado || 'VIG',
+          s.categoria || 'Propietario',
+          s.observaciones || ''
+        ]);
+      }
+      await pool.query("SELECT setval('socios_id_seq', (SELECT GREATEST(MAX(id), 1) FROM socios))");
+      return res.json({ success: true, count: NOMINA_206_SOCIOS.length, message: `${NOMINA_206_SOCIOS.length} socios cargados en Supabase correctamente.` });
+    } catch (err) {
+      console.error('Error al cargar nómina:', err);
+      return res.status(500).json({ error: 'Error al cargar nómina en base de datos', message: err.message });
+    }
+  }
+  res.json({ success: true, count: NOMINA_206_SOCIOS.length, message: 'Nómina cargada en memoria.' });
+});
+
+// Endpoint bulk para carga de socios en lote
+app.post('/api/socios/bulk', async (req, res) => {
+  const { socios: lista } = req.body;
+  const data = Array.isArray(lista) ? lista : NOMINA_206_SOCIOS;
+  if (pool) {
+    try {
+      await pool.query('ALTER TABLE socios ADD COLUMN IF NOT EXISTS nro_movil VARCHAR(20)');
+      for (const s of data) {
+        await pool.query(`
+          INSERT INTO socios (id, nro_movil, nombres, ap_paterno, ap_materno, ci, celular, fecha_ingreso, estado, categoria, observaciones)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (id) DO UPDATE 
+          SET nro_movil = EXCLUDED.nro_movil,
+              nombres = EXCLUDED.nombres,
+              ap_paterno = EXCLUDED.ap_paterno,
+              ap_materno = EXCLUDED.ap_materno,
+              ci = EXCLUDED.ci,
+              celular = EXCLUDED.celular,
+              fecha_ingreso = EXCLUDED.fecha_ingreso,
+              estado = EXCLUDED.estado,
+              categoria = EXCLUDED.categoria,
+              observaciones = EXCLUDED.observaciones
+        `, [
+          s.id,
+          s.nroMovil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : `${s.id}`),
+          s.nombres,
+          s.apPaterno,
+          s.apMaterno || '',
+          s.ci || `S/C-${s.nroMovil || s.id}`,
+          s.celular || '',
+          s.fechaIngreso || new Date().toISOString().slice(0, 10),
+          s.estado || 'VIG',
+          s.categoria || 'Propietario',
+          s.observaciones || ''
+        ]);
+      }
+      await pool.query("SELECT setval('socios_id_seq', (SELECT GREATEST(MAX(id), 1) FROM socios))");
+      return res.json({ success: true, count: data.length, message: `${data.length} socios guardados en Supabase.` });
+    } catch (err) {
+      console.error('Error en bulk socios:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true, count: data.length });
 });
 
 app.post('/api/socios', async (req, res) => {
-  const { nombres, apPaterno, apMaterno, ci, celular, fechaIngreso, estado, categoria, observaciones } = req.body;
+  const { id, customId, nroMovil, nombres, apPaterno, apMaterno, ci, celular, fechaIngreso, estado, categoria, observaciones } = req.body;
   if (!nombres || !apPaterno) {
     return res.status(400).json({ error: 'Nombres y Apellido Paterno son obligatorios.' });
   }
 
+  const assignedId = (id !== undefined && id !== null && id !== '') 
+    ? parseInt(id) 
+    : ((customId !== undefined && customId !== null && customId !== '') ? parseInt(customId) : null);
+  const finalMovil = nroMovil || (customId !== undefined ? `${customId}` : (assignedId !== null ? `${assignedId}` : ''));
+
   if (pool) {
     try {
-      const query = `
-        INSERT INTO socios (nombres, ap_paterno, ap_materno, ci, celular, fecha_ingreso, estado, categoria, observaciones)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING *
-      `;
-      const values = [
-        nombres,
-        apPaterno,
-        apMaterno || '',
-        ci || `CI-${Date.now()}`,
-        celular || '',
-        fechaIngreso || new Date().toISOString().slice(0, 10),
-        estado || 'VIG',
-        categoria || 'Propietario',
-        observaciones || ''
-      ];
+      let query;
+      let values;
+      if (assignedId !== null && !isNaN(assignedId)) {
+        query = `
+          INSERT INTO socios (id, nro_movil, nombres, ap_paterno, ap_materno, ci, celular, fecha_ingreso, estado, categoria, observaciones)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (id) DO UPDATE 
+          SET nro_movil = EXCLUDED.nro_movil,
+              nombres = EXCLUDED.nombres,
+              ap_paterno = EXCLUDED.ap_paterno,
+              ap_materno = EXCLUDED.ap_materno,
+              ci = EXCLUDED.ci,
+              celular = EXCLUDED.celular,
+              fecha_ingreso = EXCLUDED.fecha_ingreso,
+              estado = EXCLUDED.estado,
+              categoria = EXCLUDED.categoria,
+              observaciones = EXCLUDED.observaciones
+          RETURNING *
+        `;
+        values = [
+          assignedId,
+          finalMovil || (assignedId < 10 && assignedId >= 0 ? `0${assignedId}` : `${assignedId}`),
+          nombres,
+          apPaterno,
+          apMaterno || '',
+          ci || `S/C-${assignedId}`,
+          celular || '',
+          fechaIngreso || new Date().toISOString().slice(0, 10),
+          estado || 'VIG',
+          categoria || 'Propietario',
+          observaciones || ''
+        ];
+      } else {
+        query = `
+          INSERT INTO socios (nro_movil, nombres, ap_paterno, ap_materno, ci, celular, fecha_ingreso, estado, categoria, observaciones)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *
+        `;
+        values = [
+          finalMovil,
+          nombres,
+          apPaterno,
+          apMaterno || '',
+          ci || `S/C-${Date.now()}`,
+          celular || '',
+          fechaIngreso || new Date().toISOString().slice(0, 10),
+          estado || 'VIG',
+          categoria || 'Propietario',
+          observaciones || ''
+        ];
+      }
       const { rows } = await pool.query(query, values);
       const s = rows[0];
       const created = {
         id: s.id,
+        nroMovil: s.nro_movil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : `${s.id}`),
         nombres: s.nombres,
         apPaterno: s.ap_paterno,
         apMaterno: s.ap_materno,
@@ -114,7 +302,7 @@ app.post('/api/socios', async (req, res) => {
         estado: s.estado,
         categoria: s.categoria,
         observaciones: s.observaciones,
-        acciones: [{ id: `10${s.id}`, fecha: s.fecha_ingreso, monto: 0.0, estado: s.estado, categoria: s.categoria }],
+        acciones: [{ id: `ACC-${s.nro_movil || s.id}`, fecha: s.fecha_ingreso, monto: 0.0, estado: s.estado, categoria: s.categoria }],
         obligaciones: [
           { nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" },
           { nombre: "Mantenimiento GPS", monto: 80.0, periodicidad: "Mensual" }
@@ -127,30 +315,33 @@ app.post('/api/socios', async (req, res) => {
     }
   }
 
-  res.status(201).json({ id: Date.now(), ...req.body });
+  const mockId = assignedId !== null ? assignedId : Date.now();
+  res.status(201).json({ id: mockId, nroMovil: finalMovil || `${mockId}`, ...req.body });
 });
 
 app.put('/api/socios/:id', async (req, res) => {
   const { id } = req.params;
-  const { nombres, apPaterno, apMaterno, ci, celular, fechaIngreso, estado, categoria, observaciones, vehiculo, placa } = req.body;
+  const { nroMovil, nombres, apPaterno, apMaterno, ci, celular, fechaIngreso, estado, categoria, observaciones, vehiculo, placa } = req.body;
 
   if (pool) {
     try {
       const query = `
         UPDATE socios 
-        SET nombres = COALESCE($1, nombres),
-            ap_paterno = COALESCE($2, ap_paterno),
-            ap_materno = COALESCE($3, ap_materno),
-            ci = COALESCE($4, ci),
-            celular = COALESCE($5, celular),
-            fecha_ingreso = COALESCE($6, fecha_ingreso),
-            estado = COALESCE($7, estado),
-            categoria = COALESCE($8, categoria),
-            observaciones = COALESCE($9, observaciones)
-        WHERE id = $10
+        SET nro_movil = COALESCE($1, nro_movil),
+            nombres = COALESCE($2, nombres),
+            ap_paterno = COALESCE($3, ap_paterno),
+            ap_materno = COALESCE($4, ap_materno),
+            ci = COALESCE($5, ci),
+            celular = COALESCE($6, celular),
+            fecha_ingreso = COALESCE($7, fecha_ingreso),
+            estado = COALESCE($8, estado),
+            categoria = COALESCE($9, categoria),
+            observaciones = COALESCE($10, observaciones)
+        WHERE id = $11
         RETURNING *
       `;
       const values = [
+        nroMovil,
         nombres,
         apPaterno,
         apMaterno,
@@ -169,6 +360,7 @@ app.put('/api/socios/:id', async (req, res) => {
       const s = rows[0];
       return res.json({
         id: s.id,
+        nroMovil: s.nro_movil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : `${s.id}`),
         nombres: s.nombres,
         apPaterno: s.ap_paterno,
         apMaterno: s.ap_materno,

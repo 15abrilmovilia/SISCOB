@@ -59,7 +59,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const [socios, setSocios] = useState(() => loadFromStorage(STORAGE_KEYS.SOCIOS, INITIAL_SOCIOS));
+  const [socios, setSocios] = useState(() => {
+    const loaded = loadFromStorage(STORAGE_KEYS.SOCIOS, null);
+    if (!loaded || !Array.isArray(loaded) || loaded.length === 0) {
+      return INITIAL_SOCIOS;
+    }
+    return loaded;
+  });
   const [deudas, setDeudas] = useState(() => loadFromStorage(STORAGE_KEYS.DEUDAS, INITIAL_DEUDAS));
   const [cajas, setCajas] = useState(() => {
     const loaded = loadFromStorage(STORAGE_KEYS.CAJAS, null);
@@ -95,7 +101,7 @@ export default function App() {
           getEgresosAPI(),
           getUsuariosAPI()
         ]);
-        if (Array.isArray(cloudSocios)) setSocios(cloudSocios);
+        if (Array.isArray(cloudSocios) && cloudSocios.length > 0) setSocios(cloudSocios);
         if (Array.isArray(cloudCajas) && cloudCajas.length > 0) setCajas(cloudCajas);
         if (Array.isArray(cloudDeudas)) setDeudas(cloudDeudas);
         if (Array.isArray(cloudEgresos)) setEgresos(cloudEgresos);

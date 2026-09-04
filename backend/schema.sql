@@ -6,6 +6,7 @@
 -- 1. Tabla de Socios / Afiliados
 CREATE TABLE IF NOT EXISTS socios (
     id SERIAL PRIMARY KEY,
+    nro_movil VARCHAR(20),
     nombres VARCHAR(100) NOT NULL,
     ap_paterno VARCHAR(100) NOT NULL,
     ap_materno VARCHAR(100),

@@ -58,7 +58,7 @@ export default function CobranzasPage({
   // Navigation: 'cobro' (Ventanilla) | 'historial' (Recibos emitidos)
   const [activeSubTab, setActiveSubTab] = useState('cobro');
 
-  const [selectedSocioId, setSelectedSocioId] = useState(preselectedSocioId || 20);
+  const [selectedSocioId, setSelectedSocioId] = useState(preselectedSocioId ?? (socios[0]?.id ?? 0));
   const [selectedDeudaIds, setSelectedDeudaIds] = useState(['d1', 'd2', 'd3', 'd4', 'd5']);
   const [observaciones, setObservaciones] = useState('');
   const [currentReceipt, setCurrentReceipt] = useState(null);
@@ -367,7 +367,7 @@ export default function CobranzasPage({
                 </label>
                 <div className="relative flex-1">
                   <select
-                    value={activeSocio?.id || ''}
+                    value={activeSocio?.id ?? ''}
                     onChange={(e) => {
                       setSelectedSocioId(Number(e.target.value));
                       setSelectedDeudaIds([]);
@@ -376,7 +376,7 @@ export default function CobranzasPage({
                   >
                     {socios.map(s => (
                       <option key={s.id} value={s.id}>
-                        {s.nombres} {s.apPaterno} {s.apMaterno || ''} ({s.id}) - CI: {s.ci}
+                        Móvil #{s.nroMovil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : s.id)} - {s.nombres} {s.apPaterno} {s.apMaterno || ''} ({s.categoria})
                       </option>
                     ))}
                   </select>
