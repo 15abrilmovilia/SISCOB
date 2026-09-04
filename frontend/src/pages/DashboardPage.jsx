@@ -135,44 +135,50 @@ export default function DashboardPage({
       }
     });
 
-    // B. Complementar con deudas de préstamos pendientes en Caja Rápida
-    deudas.forEach(d => {
-      if (d.pagado) return;
-      const desc = (d.descripcion || '').toUpperCase();
-      const isLoanDebt = d.conceptoId === 7 || desc.includes('PRÉSTAMO') || desc.includes('PRESTAMO') || desc.includes('AMORTIZ');
-      if (!isLoanDebt) return;
+    // B. Complementar con deudas de préstamos pendientes en Caja Rápida SOLO si hay préstamos activos
+    if (prestamos.length > 0) {
+      deudas.forEach(d => {
+        if (d.pagado) return;
+        const desc = (d.descripcion || '').toUpperCase();
+        const isLoanDebt = d.conceptoId === 7 || desc.includes('PRÉSTAMO') || desc.includes('PRESTAMO') || desc.includes('AMORTIZ') || desc.includes('PR-2026-');
+        if (!isLoanDebt) return;
 
-      const alreadyIn = alertas.some(a => a.socioId === d.socioId && Math.abs(a.monto - parseFloat(d.monto)) < 0.05);
-      if (alreadyIn) return;
+        // Solo alertar si el socio o folio corresponde a un préstamo activo en cartera
+        const matchPrestamo = prestamos.some(p => p.socioId === d.socioId || (p.folio && desc.includes(p.folio.toUpperCase())));
+        if (!matchPrestamo) return;
 
-      const socio = socios.find(s => s.id === d.socioId);
-      const socioNombre = socio ? `${socio.nombres} ${socio.apPaterno}` : `Socio #${d.socioId}`;
-      const movilDisplay = socio?.nroMovil || d.socioId || '';
+        const alreadyIn = alertas.some(a => a.socioId === d.socioId && Math.abs(a.monto - parseFloat(d.monto)) < 0.05);
+        if (alreadyIn) return;
 
-      let fechaD = d.fechaVencimiento ? new Date(d.fechaVencimiento) : (d.fecha ? new Date(d.fecha) : null);
-      if (!fechaD || isNaN(fechaD.getTime())) {
-        fechaD = new Date();
-      }
-      fechaD.setHours(0, 0, 0, 0);
-      const diffTime = fechaD.getTime() - hoy.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const socio = socios.find(s => s.id === d.socioId);
+        const socioNombre = socio ? `${socio.nombres} ${socio.apPaterno}` : `Socio #${d.socioId}`;
+        const movilDisplay = socio?.nroMovil || d.socioId || '';
 
-      if (diffDays <= 15) {
-        alertas.push({
-          id: `d-${d.id}`,
-          socioId: d.socioId,
-          socioNombre,
-          movil: movilDisplay,
-          folio: d.descripcion.includes('PR-') ? d.descripcion.match(/PR-[\w-]+/)?.[0] || 'CRÉDITO' : 'CRÉDITO',
-          cuotaNro: d.periodo || 'Cuota',
-          totalCuotas: '',
-          monto: parseFloat(d.monto),
-          fechaLimite: d.fechaVencimiento || fechaD.toLocaleDateString('es-BO'),
-          diffDays,
-          estado: diffDays < 0 ? 'VENCIDA' : diffDays === 0 ? 'VENCE HOY' : 'POR VENCER'
-        });
-      }
-    });
+        let fechaD = d.fechaVencimiento ? new Date(d.fechaVencimiento) : (d.fecha ? new Date(d.fecha) : null);
+        if (!fechaD || isNaN(fechaD.getTime())) {
+          fechaD = new Date();
+        }
+        fechaD.setHours(0, 0, 0, 0);
+        const diffTime = fechaD.getTime() - hoy.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 15) {
+          alertas.push({
+            id: `d-${d.id}`,
+            socioId: d.socioId,
+            socioNombre,
+            movil: movilDisplay,
+            folio: d.descripcion.includes('PR-') ? d.descripcion.match(/PR-[\w-]+/)?.[0] || 'CRÉDITO' : 'CRÉDITO',
+            cuotaNro: d.periodo || 'Cuota',
+            totalCuotas: '',
+            monto: parseFloat(d.monto),
+            fechaLimite: d.fechaVencimiento || fechaD.toLocaleDateString('es-BO'),
+            diffDays,
+            estado: diffDays < 0 ? 'VENCIDA' : diffDays === 0 ? 'VENCE HOY' : 'POR VENCER'
+          });
+        }
+      });
+    }
 
     return alertas.sort((a, b) => a.diffDays - b.diffDays);
   }, [prestamos, deudas, socios]);

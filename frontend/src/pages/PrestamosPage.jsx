@@ -15,7 +15,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
-import { createEgresoAPI, createDeudaAPI } from '../utils/api';
+import { createEgresoAPI, createDeudaAPI, deleteDeudasPrestamosAPI } from '../utils/api';
 import { printIsolatedDocument, generatePlanDePagosHTML } from '../utils/printHelper';
 
 export default function PrestamosPage({ 
@@ -250,11 +250,29 @@ export default function PrestamosPage({
     setTimeout(() => setLoanSuccessMsg(null), 5000);
   };
 
-  const handleVaciarCartera = () => {
-    if (window.confirm('¿Está seguro de reiniciar la cartera de préstamos a cero? Esta acción eliminará todos los préstamos registrados actualmente.')) {
+  const handleVaciarCartera = async () => {
+    if (window.confirm('¿Está seguro de reiniciar la cartera de préstamos a cero? Esta acción eliminará todos los préstamos registrados y sus cuotas pendientes en el sistema.')) {
       setPrestamos([]);
       saveToStorage('siscob_prestamos', []);
-      setLoanSuccessMsg('Cartera de préstamos reiniciada a cero.');
+
+      if (setDeudas) {
+        setDeudas(prev => {
+          const limpias = prev.filter(d => {
+            const desc = (d.descripcion || '').toUpperCase();
+            return !(d.conceptoId === 7 || desc.includes('PRÉSTAMO') || desc.includes('PRESTAMO') || desc.includes('AMORTIZ') || desc.includes('PR-2026-'));
+          });
+          saveToStorage('siscob_deudas', limpias);
+          return limpias;
+        });
+      }
+
+      try {
+        await deleteDeudasPrestamosAPI();
+      } catch (err) {
+        console.warn('Aviso al limpiar deudas de préstamos remotas:', err);
+      }
+
+      setLoanSuccessMsg('Cartera de préstamos y cuotas pendientes reiniciadas a cero.');
       setTimeout(() => setLoanSuccessMsg(null), 4000);
     }
   };

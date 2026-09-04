@@ -611,6 +611,34 @@ app.post('/api/deudas', async (req, res) => {
     }
   }
   res.status(201).json({ id: `d${Date.now()}`, ...req.body, pagado: false });
+// Endpoint para eliminar todas las cuotas de préstamos huérfanas o de prueba
+app.delete('/api/deudas/prestamos', async (req, res) => {
+  if (pool) {
+    try {
+      const { rows } = await pool.query(
+        "DELETE FROM deudas_socio WHERE concepto_id = 7 OR descripcion ILIKE '%préstamo%' OR descripcion ILIKE '%prestamo%' OR descripcion ILIKE '%PR-%' RETURNING id"
+      );
+      return res.json({ success: true, count: rows.length, message: `${rows.length} deudas de préstamos eliminadas de Supabase.` });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true, count: 0, message: 'Deudas de préstamos limpiadas en memoria.' });
+});
+
+// Endpoint para eliminar una deuda específica por ID
+app.delete('/api/deudas/:id', async (req, res) => {
+  const { id } = req.params;
+  const cleanId = typeof id === 'string' ? parseInt(id.replace('d', '')) : id;
+  if (pool && !isNaN(cleanId)) {
+    try {
+      await pool.query('DELETE FROM deudas_socio WHERE id = $1', [cleanId]);
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true });
 });
 
 // 5. Egresos Endpoints

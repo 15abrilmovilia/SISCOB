@@ -48,7 +48,8 @@ import {
   getDeudasAPI, 
   getEgresosAPI,
   getUsuariosAPI,
-  resetSistemaAPI
+  resetSistemaAPI,
+  deleteDeudasPrestamosAPI
 } from './utils/api';
 
 export default function App() {
@@ -109,7 +110,21 @@ export default function App() {
         ]);
         if (Array.isArray(cloudSocios) && cloudSocios.length > 0) setSocios(cloudSocios);
         if (Array.isArray(cloudCajas) && cloudCajas.length > 0) setCajas(cloudCajas);
-        if (Array.isArray(cloudDeudas) && cloudDeudas.length > 0) setDeudas(cloudDeudas);
+        if (Array.isArray(cloudDeudas) && cloudDeudas.length > 0) {
+          // Si la cartera de préstamos está vacía, no importar cuotas huérfanas de préstamos de prueba
+          if (prestamos.length === 0) {
+            const limpias = cloudDeudas.filter(d => {
+              const desc = (d.descripcion || '').toUpperCase();
+              return !(d.conceptoId === 7 || desc.includes('PRÉSTAMO') || desc.includes('PRESTAMO') || desc.includes('AMORTIZ') || desc.includes('PR-2026-'));
+            });
+            setDeudas(limpias);
+            if (limpias.length !== cloudDeudas.length) {
+              deleteDeudasPrestamosAPI().catch(() => {});
+            }
+          } else {
+            setDeudas(cloudDeudas);
+          }
+        }
         if (Array.isArray(cloudEgresos)) setEgresos(cloudEgresos);
         if (Array.isArray(cloudUsuarios) && cloudUsuarios.length > 0) setUsuarios(cloudUsuarios);
       } catch (err) {
@@ -118,6 +133,26 @@ export default function App() {
     }
     syncCloud();
   }, []);
+
+  // Si la cartera de préstamos está en cero, purgar automáticamente cualquier cuota de préstamo huérfana
+  useEffect(() => {
+    if (prestamos.length === 0 && deudas.length > 0) {
+      const tieneHuérfanas = deudas.some(d => {
+        const desc = (d.descripcion || '').toUpperCase();
+        return d.conceptoId === 7 || desc.includes('PRÉSTAMO') || desc.includes('PRESTAMO') || desc.includes('AMORTIZ') || desc.includes('PR-2026-');
+      });
+
+      if (tieneHuérfanas) {
+        const deudasFiltradas = deudas.filter(d => {
+          const desc = (d.descripcion || '').toUpperCase();
+          return !(d.conceptoId === 7 || desc.includes('PRÉSTAMO') || desc.includes('PRESTAMO') || desc.includes('AMORTIZ') || desc.includes('PR-2026-'));
+        });
+        setDeudas(deudasFiltradas);
+        saveToStorage(STORAGE_KEYS.DEUDAS, deudasFiltradas);
+        deleteDeudasPrestamosAPI().catch(() => {});
+      }
+    }
+  }, [prestamos, deudas]);
 
   const [preselectedSocioId, setPreselectedSocioId] = useState(20);
   const [printMode, setPrintMode] = useState('termico');

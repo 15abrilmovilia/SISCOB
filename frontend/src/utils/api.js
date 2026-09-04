@@ -91,6 +91,31 @@ export async function createDeudaAPI(deudaData) {
   }
 }
 
+export async function deleteDeudasPrestamosAPI() {
+  try {
+    const res = await fetch(`${API_BASE}/api/deudas/prestamos`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al eliminar deudas de préstamos remotas:', err.message);
+    return null;
+  }
+}
+
+export async function deleteDeudaAPI(id) {
+  try {
+    const res = await fetch(`${API_BASE}/api/deudas/${id}`, {
+      method: 'DELETE'
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[SISCOB API] Error al eliminar deuda remota:', err.message);
+    return false;
+  }
+}
+
 export async function getEgresosAPI() {
   try {
     const res = await fetch(`${API_BASE}/api/egresos`);
