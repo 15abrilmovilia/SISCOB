@@ -10108,6 +10108,32 @@ export const INITIAL_DEUDAS = [
   }
 ];
 
+// Catálogo Oficial de Conceptos de Ingreso por Cajas - Radio Móvil 15 de Abril
+export const INITIAL_CONCEPTOS = [
+  // Caja 1: Caja de Frecuencia
+  { id: 'con-1', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'CUOTA FRECUENCIA MENSUAL SOCIOS', tipo: 'Mensualidad', monto: 200.0, periodicidad: 'Mensual', descripcion: 'Frecuencia mensual ordinaria de socios propietarios' },
+  { id: 'con-c1-don90', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'DONACION COLABORACION M 90', tipo: 'Colaboración', monto: 50.0, periodicidad: 'Variable', descripcion: 'Donación o colaboración voluntaria para móvil 90' },
+  { id: 'con-c1-col202', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'COLABORACION M 202', tipo: 'Colaboración', monto: 0.0, periodicidad: 'Variable', descripcion: 'Colaboración especial institucional para móvil 202' },
+  { id: 'con-c1-logos', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'LOGOTIPOS', tipo: 'Insumo / Venta', monto: 30.0, periodicidad: 'A demanda', descripcion: 'Adhesivos y logotipos distintivos de la asociación' },
+  { id: 'con-c1-num-peq', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'NUMEROS ADHESIVOS PEQUEÑOS', tipo: 'Insumo / Venta', monto: 15.0, periodicidad: 'A demanda', descripcion: 'Juego de números adhesivos pequeños para móvil' },
+  { id: 'con-c1-num-gra', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'NUMEROS ADHESIVOS GRANDES', tipo: 'Insumo / Venta', monto: 25.0, periodicidad: 'A demanda', descripcion: 'Juego de números adhesivos grandes para puertas y techo' },
+
+  // Caja 2: Caja de Multas e Infracciones
+  { id: 'con-2', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'MULTA POR NO HACER TURNO', tipo: 'Multa', monto: 20.0, periodicidad: 'Variable', descripcion: 'Sanción reglamentaria por no cumplir turno' },
+  { id: 'con-3', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'MULTA ARTÍCULO 5', tipo: 'Multa', monto: 5.0, periodicidad: 'Variable', descripcion: 'Infracción según Artículo 5' },
+  { id: 'con-4', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'DENUNCIA POR MENTIR UBICACIÓN', tipo: 'Multa', monto: 20.0, periodicidad: 'Variable', descripcion: 'Sanción disciplinaria por falsear ubicación' },
+  { id: 'con-5', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'NO CUMPLIR TURNO EN DOMINGO Y FERIADO', tipo: 'Multa', monto: 40.0, periodicidad: 'Variable', descripcion: 'Inasistencia a turno en domingos o feriados' },
+
+  // Caja 3: Caja Nuevos Socios
+  { id: 'con-6', cajaId: 'c3', cajaNombre: 'CAJA NUEVOS SOCIOS', nombre: 'PAGO DE NUEVOS SOCIOS (INSCRIPCIÓN)', tipo: 'Inscripción', monto: 500.0, periodicidad: 'Única', descripcion: 'Cuota de aportación e ingreso nuevo afiliado' },
+
+  // Caja 4: Caja Préstamos
+  { id: 'con-7', cajaId: 'c4', cajaNombre: 'CAJA PRÉSTAMOS', nombre: 'PRÉSTAMOS (INGRESOS Y EGRESOS)', tipo: 'Amortización', monto: 0.0, periodicidad: 'Mensual', descripcion: 'Créditos internos: amortizaciones y desembolsos' },
+
+  // Caja 5: Caja Frecuencia Inquilinos
+  { id: 'con-8', cajaId: 'c5', cajaNombre: 'CAJA FRECUENCIA INQUILINOS', nombre: 'FRECUENCIA DE CONDUCTORES INQUILINOS', tipo: 'Mensualidad', monto: 250.0, periodicidad: 'Mensual', descripcion: 'Uso de frecuencia conductores relevos/inquilinos' }
+];
+
 // 5 Cajas Oficiales de Recaudación y Operación - Radio Móvil 15 de Abril
 export const INITIAL_CAJAS = [
   { 

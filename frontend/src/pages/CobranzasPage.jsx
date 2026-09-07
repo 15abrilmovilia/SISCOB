@@ -15,9 +15,12 @@ import {
   ArrowLeft,
   Landmark,
   Calendar,
-  Edit3
+  Edit3,
+  PlusCircle,
+  Tag
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
+import CobroDirectoModal from '../components/CobroDirectoModal';
 import { registrarCobranzaAPI, anularCobranzaAPI } from '../utils/api';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 
@@ -49,6 +52,7 @@ export default function CobranzasPage({
   setDeudas, 
   cajas, 
   setCajas, 
+  conceptos = [],
   preselectedSocioId, 
   printMode,
   recibos,
@@ -88,6 +92,18 @@ export default function CobranzasPage({
 
   // Search in Historial
   const [historialSearch, setHistorialSearch] = useState('');
+
+  // Estado para Modal de Cobro Directo de Conceptos (Logos, Donaciones, etc.)
+  const [isCobroDirectoOpen, setIsCobroDirectoOpen] = useState(false);
+
+  const handleCobroDirectoAgregado = (nuevoItem) => {
+    if (setDeudas) {
+      setDeudas(prev => [nuevoItem, ...prev]);
+    }
+    setSelectedDeudaIds(prev => [...prev, nuevoItem.id]);
+    setAlertMsg(`Ítem "${nuevoItem.descripcion}" agregado con éxito al cobro.`);
+    setTimeout(() => setAlertMsg(null), 4000);
+  };
 
   const activeSocio = socios.find(s => s.id === Number(selectedSocioId)) || socios[0];
   const socioDeudas = deudas.filter(d => d.socioId === activeSocio?.id && !d.pagado);
@@ -474,17 +490,27 @@ export default function CobranzasPage({
 
           {/* Main Table: Obligations / Debts */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs">
+            <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2 text-xs">
               <div className="flex items-center space-x-2 font-bold text-slate-800 uppercase">
                 <CheckSquare className="w-4 h-4 text-blue-700" />
                 <span>Obligaciones Pendientes de Pago ({socioDeudas.length})</span>
               </div>
-              <button
-                onClick={selectAll}
-                className="text-blue-700 hover:text-blue-900 font-bold text-xs cursor-pointer hover:underline"
-              >
-                {selectedDeudaIds.length === socioDeudas.length ? 'Desmarcar Todos' : 'Marcar Todos'}
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCobroDirectoOpen(true)}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-xs transition cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>+ Cobro Directo (Logos, Donaciones...)</span>
+                </button>
+                <button
+                  onClick={selectAll}
+                  className="text-blue-700 hover:text-blue-900 font-bold text-xs cursor-pointer hover:underline ml-2"
+                >
+                  {selectedDeudaIds.length === socioDeudas.length ? 'Desmarcar Todos' : 'Marcar Todos'}
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -893,6 +919,15 @@ export default function CobranzasPage({
           </div>
         </div>
       )}
+
+      {/* Modal para Cobro Directo de Conceptos (Logos, Donaciones, etc.) */}
+      <CobroDirectoModal
+        isOpen={isCobroDirectoOpen}
+        onClose={() => setIsCobroDirectoOpen(false)}
+        socio={activeSocio}
+        conceptos={conceptos}
+        onCobroDirectoAgregado={handleCobroDirectoAgregado}
+      />
     </div>
   );
 }

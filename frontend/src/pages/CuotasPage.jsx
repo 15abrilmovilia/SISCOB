@@ -6,41 +6,81 @@ import {
   AlertCircle, 
   ShieldAlert,
   Zap,
-  CalendarCheck
+  CalendarCheck,
+  Edit3,
+  Trash2,
+  Tag
 } from 'lucide-react';
 import { createDeudaAPI } from '../utils/api';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
+import { INITIAL_CONCEPTOS } from '../data/mockData';
 import AsignarCuotaModal from '../components/AsignarCuotaModal';
 import GenerarFrecuenciaModal from '../components/GenerarFrecuenciaModal';
+import ConceptoModal from '../components/ConceptoModal';
 
-const INITIAL_CONCEPTOS = [
-  { id: 'con-1', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'CUOTA FRECUENCIA MENSUAL SOCIOS', tipo: 'Mensualidad', monto: 200.0, periodicidad: 'Mensual', sociosAfectados: 206, descripcion: 'Se genera cada mes a todos los números móvil' },
-  { id: 'con-2', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'MULTA POR NO HACER TURNO', tipo: 'Multa', monto: 20.0, periodicidad: 'Variable', sociosAfectados: 0, descripcion: 'Sanción reglamentaria por no cumplir turno' },
-  { id: 'con-3', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'MULTA ARTÍCULO 5', tipo: 'Multa', monto: 5.0, periodicidad: 'Variable', sociosAfectados: 0, descripcion: 'Infracción según Artículo 5' },
-  { id: 'con-4', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'DENUNCIA POR MENTIR UBICACIÓN', tipo: 'Multa', monto: 20.0, periodicidad: 'Variable', sociosAfectados: 0, descripcion: 'Sanción disciplinaria por falsear ubicación' },
-  { id: 'con-5', cajaId: 'c2', cajaNombre: 'CAJA DE MULTAS E INFRACCIONES', nombre: 'NO CUMPLIR TURNO EN DOMINGO Y FERIADO', tipo: 'Multa', monto: 40.0, periodicidad: 'Variable', sociosAfectados: 0, descripcion: 'Inasistencia a turno en domingos o feriados' },
-  { id: 'con-6', cajaId: 'c3', cajaNombre: 'CAJA NUEVOS SOCIOS', nombre: 'PAGO DE NUEVOS SOCIOS', tipo: 'Inscripción', monto: 500.0, periodicidad: 'Única', sociosAfectados: 0, descripcion: 'Cuota de aportación e ingreso nuevo afiliado' },
-  { id: 'con-7', cajaId: 'c4', cajaNombre: 'CAJA PRÉSTAMOS', nombre: 'PRÉSTAMOS (INGRESOS Y EGRESOS)', tipo: 'Amortización', monto: 0.0, periodicidad: 'Mensual', sociosAfectados: 0, descripcion: 'Créditos internos: amortizaciones y desembolsos' },
-  { id: 'con-8', cajaId: 'c5', cajaNombre: 'CAJA FRECUENCIA INQUILINOS', nombre: 'FRECUENCIA DE CONDUCTORES INQUILINOS', tipo: 'Mensualidad', monto: 250.0, periodicidad: 'Mensual', sociosAfectados: 0, descripcion: 'Uso de frecuencia conductores relevos/inquilinos' }
-];
-
-export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
+export default function CuotasPage({ 
+  socios = [], 
+  deudas = [], 
+  setDeudas,
+  conceptos: propConceptos,
+  setConceptos: propSetConceptos
+}) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isIndividualModalOpen, setIsIndividualModalOpen] = useState(false);
   const [isGenerarFrecuenciaOpen, setIsGenerarFrecuenciaOpen] = useState(false);
+  const [isConceptoModalOpen, setIsConceptoModalOpen] = useState(false);
+  const [editingConcepto, setEditingConcepto] = useState(null);
   
-  // Conceptos vigentes con persistencia
-  const [conceptos, setConceptos] = useState(() => {
+  // Conceptos vigentes con fallback local
+  const [localConceptos, setLocalConceptos] = useState(() => {
     const loaded = loadFromStorage('siscob_conceptos', null);
-    if (!loaded || !Array.isArray(loaded) || loaded.length !== INITIAL_CONCEPTOS.length || loaded[0]?.monto === 400) {
+    if (!loaded || !Array.isArray(loaded) || loaded.length === 0) {
       return INITIAL_CONCEPTOS;
     }
     return loaded;
   });
 
+  const conceptos = propConceptos !== undefined ? propConceptos : localConceptos;
+  const setConceptos = propSetConceptos || setLocalConceptos;
+
   useEffect(() => {
     saveToStorage('siscob_conceptos', conceptos);
   }, [conceptos]);
+
+  // Manejadores para Crear, Editar y Eliminar Conceptos de Ingreso
+  const handleOpenCrearConcepto = () => {
+    setEditingConcepto(null);
+    setIsConceptoModalOpen(true);
+  };
+
+  const handleOpenEditarConcepto = (c) => {
+    setEditingConcepto(c);
+    setIsConceptoModalOpen(true);
+  };
+
+  const handleSaveConcepto = (savedItem) => {
+    const existe = conceptos.some(c => c.id === savedItem.id);
+    if (existe) {
+      setConceptos(prev => prev.map(c => c.id === savedItem.id ? savedItem : c));
+    } else {
+      setConceptos(prev => [savedItem, ...prev]);
+    }
+  };
+
+  const handleEliminarConcepto = (c) => {
+    if (c.id === 'con-1' || c.id === 'con-8') {
+      alert('La Cuota de Frecuencia Oficial es la base del sistema y no puede ser eliminada.');
+      return;
+    }
+
+    const confirmar = window.confirm(
+      `¿Está seguro de eliminar el concepto de ingreso "${c.nombre}" del catálogo?\n\n` +
+      `No se borrarán los recibos o cobros históricos ya realizados con este concepto.`
+    );
+    if (!confirmar) return;
+
+    setConceptos(prev => prev.filter(item => item.id !== c.id));
+  };
 
   // Double list selector state for modal
   const [exentos, setExentos] = useState([]);
@@ -216,6 +256,13 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={handleOpenCrearConcepto}
+            className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2.5 rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
+          >
+            <Tag className="w-4 h-4" />
+            <span>+ Nuevo Concepto de Ingreso</span>
+          </button>
+          <button
             onClick={() => setIsGenerarFrecuenciaOpen(true)}
             className="flex items-center space-x-1.5 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-xs transition cursor-pointer border border-red-900/30 hover:shadow-md"
           >
@@ -316,6 +363,7 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
                 <th className="p-3 text-right">Monto (Bs)</th>
                 <th className="p-3 text-center">Última Aplicación</th>
                 <th className="p-3 text-center">Estado</th>
+                <th className="p-3 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-sans">
@@ -363,6 +411,27 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
                     <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold">
                       ACTIVO
                     </span>
+                  </td>
+                  <td className="p-3 text-center">
+                    <div className="flex items-center justify-center space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditarConcepto(c)}
+                        className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition cursor-pointer flex items-center space-x-1 border border-blue-200"
+                        title="Modificar nombre, caja o monto"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span className="text-[10px] font-bold">Editar</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEliminarConcepto(c)}
+                        className="p-1.5 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-700 rounded-lg transition cursor-pointer border border-slate-200"
+                        title="Eliminar concepto del catálogo"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -616,6 +685,14 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
         socios={socios}
         deudas={deudas}
         setDeudas={setDeudas}
+      />
+
+      {/* Modal para Crear y Modificar Conceptos de Ingreso */}
+      <ConceptoModal
+        isOpen={isConceptoModalOpen}
+        onClose={() => setIsConceptoModalOpen(false)}
+        conceptoToEdit={editingConcepto}
+        onSaveConcepto={handleSaveConcepto}
       />
     </div>
   );

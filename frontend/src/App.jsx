@@ -29,7 +29,8 @@ import {
   INITIAL_PRESTAMOS,
   INITIAL_RECIBOS,
   INITIAL_USERS,
-  INITIAL_ROLES
+  INITIAL_ROLES,
+  INITIAL_CONCEPTOS
 } from './data/mockData';
 
 import { 
@@ -103,6 +104,22 @@ export default function App() {
   const [recibos, setRecibos] = useState(() => loadFromStorage(STORAGE_KEYS.RECIBOS, INITIAL_RECIBOS));
   const [usuarios, setUsuarios] = useState(() => loadFromStorage(STORAGE_KEYS.USUARIOS, INITIAL_USERS));
   const [roles, setRoles] = useState(() => loadFromStorage(STORAGE_KEYS.ROLES, INITIAL_ROLES));
+  const [conceptos, setConceptos] = useState(() => {
+    const loaded = loadFromStorage('siscob_conceptos', null);
+    if (!loaded || !Array.isArray(loaded) || loaded.length === 0) {
+      return INITIAL_CONCEPTOS;
+    }
+    const mapExistentes = new Set(loaded.map(c => c.id));
+    const faltantes = INITIAL_CONCEPTOS.filter(c => !mapExistentes.has(c.id));
+    if (faltantes.length > 0) {
+      return [...loaded, ...faltantes];
+    }
+    return loaded;
+  });
+
+  useEffect(() => {
+    saveToStorage('siscob_conceptos', conceptos);
+  }, [conceptos]);
 
   // Persistir cambios en préstamos
   useEffect(() => {
@@ -429,6 +446,8 @@ export default function App() {
               socios={socios} 
               deudas={deudas}
               setDeudas={setDeudas}
+              conceptos={conceptos}
+              setConceptos={setConceptos}
             />
           )}
           {activeTab === 'cobranzas' && (
@@ -438,6 +457,7 @@ export default function App() {
               setDeudas={setDeudas}
               cajas={cajas}
               setCajas={setCajas}
+              conceptos={conceptos}
               preselectedSocioId={preselectedSocioId}
               printMode={printMode}
               recibos={recibos}
