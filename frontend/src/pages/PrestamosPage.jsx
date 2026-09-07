@@ -12,7 +12,9 @@ import {
   X,
   Clock,
   TrendingDown,
-  Trash2
+  Trash2,
+  History,
+  ShieldCheck
 } from 'lucide-react';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { createEgresoAPI, createDeudaAPI, deleteDeudasPrestamosAPI } from '../utils/api';
@@ -59,6 +61,17 @@ export default function PrestamosPage({
   const [selectedSocio, setSelectedSocio] = useState(null);
   const [cajaDesembolso, setCajaDesembolso] = useState('c4'); // c4 = Caja Préstamos
   const [loanSuccessMsg, setLoanSuccessMsg] = useState(null);
+
+  // Migration / In-Progress Loan Modal State (Préstamos Anteriores en Curso)
+  const [isMigrarModalOpen, setIsMigrarModalOpen] = useState(false);
+  const [migrarSocioSearch, setMigrarSocioSearch] = useState('');
+  const [migrarSelectedSocio, setMigrarSelectedSocio] = useState(null);
+  const [migrarFolio, setMigrarFolio] = useState('');
+  const [migrarMontoOriginal, setMigrarMontoOriginal] = useState(12000);
+  const [migrarPlazoTotal, setMigrarPlazoTotal] = useState(12);
+  const [migrarTasaAnual, setMigrarTasaAnual] = useState(12);
+  const [migrarCuotasPagadas, setMigrarCuotasPagadas] = useState(8);
+  const [migrarFechaPrimerVenc, setMigrarFechaPrimerVenc] = useState('2026-09-15');
 
   // Loan calculation logic with exact payment deadline dates (fechas límite)
   const calcularDetallesPrestamo = (pMonto, pPlazo, pTasaAnual, pDiaPago = 15) => {
@@ -114,6 +127,96 @@ export default function PrestamosPage({
       (s.ci && s.ci.toLowerCase().includes(term))
     );
   });
+
+  // Filter socios for migration modal
+  const migrarSociosFiltrados = socios.filter(s => {
+    if (!migrarSocioSearch.trim()) return false;
+    const term = migrarSocioSearch.toLowerCase();
+    const movil = (s.nroMovil || s.id || '').toString().toLowerCase();
+    return (
+      movil.includes(term) ||
+      s.id.toString().includes(term) ||
+      (s.nombres && s.nombres.toLowerCase().includes(term)) ||
+      (s.apPaterno && s.apPaterno.toLowerCase().includes(term)) ||
+      (s.ci && s.ci.toLowerCase().includes(term))
+    );
+  });
+
+  // Helper para calcular préstamos en curso otorgados en meses pasados
+  const calcularMigracion = (pMonto, pPlazo, pTasaAnual, pCuotasPagadas, pFechaPrimerVenc) => {
+    const safePlazo = Math.max(1, parseInt(pPlazo) || 12);
+    const safePagadas = Math.min(Math.max(0, parseInt(pCuotasPagadas) || 0), safePlazo - 1);
+    const safeMonto = Math.max(100, parseFloat(pMonto) || 0);
+    const safeTasa = Math.max(0, parseFloat(pTasaAnual) || 0);
+
+    const tasaMensual = (safeTasa / 100) / 12;
+    const cuotaMensual = tasaMensual > 0 
+      ? (safeMonto * (tasaMensual * Math.pow(1 + tasaMensual, safePlazo))) / (Math.pow(1 + tasaMensual, safePlazo) - 1)
+      : safeMonto / safePlazo;
+    const totalPagar = cuotaMensual * safePlazo;
+    const totalInteres = totalPagar - safeMonto;
+
+    const planPagos = [];
+    let saldoRestante = safeMonto;
+
+    const [vYear, vMonth, vDay] = (pFechaPrimerVenc || '2026-09-15').split('-').map(Number);
+    const diaPago = vDay || 15;
+    const baseDate = new Date(vYear || 2026, (vMonth || 9) - 1, diaPago);
+
+    for (let i = 1; i <= safePlazo; i++) {
+      const interesCuota = saldoRestante * tasaMensual;
+      const capitalCuota = cuotaMensual - interesCuota;
+      saldoRestante -= capitalCuota;
+      const saldoActualizado = Math.max(0, saldoRestante);
+
+      const esPagada = i <= safePagadas;
+
+      let fechaFormateada = 'Cancelado (Periodo Anterior)';
+      let fechaISO = null;
+
+      if (!esPagada) {
+        const k = i - safePagadas - 1; // 0 para la primera cuota pendiente
+        const d = new Date(baseDate.getFullYear(), baseDate.getMonth() + k, diaPago);
+        fechaISO = d.toISOString().split('T')[0];
+        const diaStr = String(d.getDate()).padStart(2, '0');
+        const mesStr = String(d.getMonth() + 1).padStart(2, '0');
+        const anioStr = d.getFullYear();
+        fechaFormateada = `${diaStr}/${mesStr}/${anioStr}`;
+      }
+
+      planPagos.push({
+        nro: i,
+        fechaLimite: fechaFormateada,
+        fechaLimiteISO: fechaISO,
+        cuota: cuotaMensual,
+        capital: capitalCuota,
+        interes: interesCuota,
+        saldo: saldoActualizado,
+        pagado: esPagada
+      });
+    }
+
+    const cuotasPendientes = Math.max(0, safePlazo - safePagadas);
+    const capitalPendiente = planPagos.filter(p => !p.pagado).reduce((acc, p) => acc + p.capital, 0);
+
+    return {
+      tasaMensual,
+      cuotaMensual,
+      totalPagar,
+      totalInteres,
+      cuotasPendientes,
+      capitalPendiente,
+      planPagos
+    };
+  };
+
+  const migrarCalc = calcularMigracion(
+    migrarMontoOriginal,
+    migrarPlazoTotal,
+    migrarTasaAnual,
+    migrarCuotasPagadas,
+    migrarFechaPrimerVenc
+  );
 
   // Handler to approve and disburse loan
   const handleAprobarPrestamo = async (e) => {
@@ -250,6 +353,116 @@ export default function PrestamosPage({
     setTimeout(() => setLoanSuccessMsg(null), 5000);
   };
 
+  // Handler para registrar y migrar préstamos anteriores en curso (NO genera egreso hoy)
+  const handleAprobarMigracion = async (e) => {
+    e.preventDefault();
+    if (!migrarSelectedSocio) {
+      alert('Por favor seleccione el socio beneficiario.');
+      return;
+    }
+    if (migrarCuotasPagadas >= migrarPlazoTotal) {
+      alert('Las cuotas ya canceladas deben ser menores al plazo total del crédito.');
+      return;
+    }
+
+    const calc = calcularMigracion(
+      migrarMontoOriginal,
+      migrarPlazoTotal,
+      migrarTasaAnual,
+      migrarCuotasPagadas,
+      migrarFechaPrimerVenc
+    );
+
+    const folio = migrarFolio.trim() || `PR-2026-ANT-${Math.floor(1000 + Math.random() * 9000)}`;
+    const nombreCompleto = `${migrarSelectedSocio.nombres} ${migrarSelectedSocio.apPaterno} ${migrarSelectedSocio.apMaterno || ''}`.trim();
+    const primeraCuotaPendiente = calc.planPagos.find(p => !p.pagado);
+
+    // 1. Registrar crédito en el Kardex institucional
+    const nuevoPrestamo = {
+      folio,
+      socio: nombreCompleto,
+      socioId: migrarSelectedSocio.id,
+      socioMovil: migrarSelectedSocio.nroMovil || migrarSelectedSocio.id,
+      socioCI: migrarSelectedSocio.ci,
+      original: migrarMontoOriginal,
+      saldo: parseFloat(calc.capitalPendiente.toFixed(2)),
+      cuota: calc.cuotaMensual,
+      plazo: migrarPlazoTotal,
+      cuotasPagadas: migrarCuotasPagadas,
+      cuotasPendientes: calc.cuotasPendientes,
+      tasaAnual: migrarTasaAnual,
+      fechaDesembolso: 'Periodo Anterior (Crédito Migrado)',
+      vencimiento: primeraCuotaPendiente ? primeraCuotaPendiente.fechaLimite : 'Por definir',
+      proximoVencimiento: primeraCuotaPendiente ? primeraCuotaPendiente.fechaLimiteISO : migrarFechaPrimerVenc,
+      planPagos: calc.planPagos,
+      estado: 'EN CURSO',
+      esMigrado: true
+    };
+
+    const actualizadosPrestamos = [nuevoPrestamo, ...prestamos];
+    setPrestamos(actualizadosPrestamos);
+    saveToStorage('siscob_prestamos', actualizadosPrestamos);
+
+    // 2. Generar en Caja Rápida / Deudas ÚNICAMENTE las cuotas pendientes
+    const nuevasDeudas = [];
+    const cuotasPendientesList = calc.planPagos.filter(p => !p.pagado);
+
+    for (const c of cuotasPendientesList) {
+      const deudaItem = {
+        id: `d-pr-${Date.now()}-${c.nro}`,
+        socioId: migrarSelectedSocio.id,
+        conceptoId: 7, // Amortización de Préstamo (Caja 4)
+        cajaId: 'c4',
+        descripcion: `Cuota Préstamo ${c.nro}/${migrarPlazoTotal} (${folio}) - Vence: ${c.fechaLimite}`,
+        periodo: `Cuota ${c.nro} (${c.fechaLimite})`,
+        monto: parseFloat(calc.cuotaMensual.toFixed(2)),
+        pagado: false,
+        fecha: c.fechaLimiteISO || migrarFechaPrimerVenc,
+        fechaVencimiento: c.fechaLimiteISO || migrarFechaPrimerVenc,
+        moneda: 'Bs',
+        cantidad: 1
+      };
+
+      nuevasDeudas.push(deudaItem);
+
+      // Guardar en Supabase
+      createDeudaAPI({
+        socioId: migrarSelectedSocio.id,
+        conceptoId: 7,
+        descripcion: deudaItem.descripcion,
+        periodo: deudaItem.periodo,
+        monto: deudaItem.monto,
+        fechaVencimiento: deudaItem.fechaVencimiento
+      });
+    }
+
+    if (setDeudas) {
+      setDeudas(prev => [...nuevasDeudas, ...prev]);
+    }
+
+    setIsMigrarModalOpen(false);
+    setMigrarSelectedSocio(null);
+    setMigrarSocioSearch('');
+    setMigrarFolio('');
+
+    // Abrir tabla de amortización para visualizarla
+    setActivePlanData({
+      folio,
+      socio: nombreCompleto,
+      socioCI: migrarSelectedSocio.ci,
+      socioMovil: migrarSelectedSocio.nroMovil || migrarSelectedSocio.id,
+      monto: migrarMontoOriginal,
+      plazo: migrarPlazoTotal,
+      tasaAnual: migrarTasaAnual,
+      cuotaMensual: calc.cuotaMensual,
+      planPagos: calc.planPagos
+    });
+    setShowPlanModal(true);
+
+    setLoanSuccessMsg(`¡Préstamo en curso ${folio} registrado exitosamente! Se programaron ${calc.cuotasPendientes} cuotas pendientes desde septiembre sin afectar la caja.`);
+    setTimeout(() => setLoanSuccessMsg(null), 6000);
+  };
+
   const handleVaciarCartera = async () => {
     if (window.confirm('¿Está seguro de reiniciar la cartera de préstamos a cero? Esta acción eliminará todos los préstamos registrados y sus cuotas pendientes en el sistema.')) {
       setPrestamos([]);
@@ -318,11 +531,19 @@ export default function PrestamosPage({
             <span>Simulador</span>
           </button>
           <button
+            onClick={() => setIsMigrarModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-xs transition cursor-pointer active:scale-95"
+            title="Registrar un préstamo anterior que ya tiene cuotas pagadas y solo faltan cuotas pendientes"
+          >
+            <History className="w-4 h-4" />
+            <span>+ Cargar Préstamo Anterior</span>
+          </button>
+          <button
             onClick={() => setIsNewLoanModalOpen(true)}
-            className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer active:scale-95"
+            className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-xs transition cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Otorgar Préstamo a Socio</span>
+            <span>+ Otorgar Préstamo Nuevo</span>
           </button>
         </div>
       </div>
@@ -360,7 +581,7 @@ export default function PrestamosPage({
                       <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
                         {socios.length === 0 
                           ? 'El sistema está en blanco para operaciones limpias. Registre socios para otorgar créditos.'
-                          : 'Haga clic en "+ Otorgar Préstamo a Socio" para registrar un crédito.'}
+                          : 'Haga clic en "+ Cargar Préstamo Anterior" o "+ Otorgar Préstamo Nuevo" para registrar créditos.'}
                       </p>
                     </td>
                   </tr>
@@ -385,11 +606,13 @@ export default function PrestamosPage({
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                           p.estado === 'AL DÍA' 
                             ? 'bg-emerald-100 text-emerald-800' 
+                            : p.estado === 'EN CURSO'
+                            ? 'bg-blue-100 text-blue-800 border border-blue-300 font-black'
                             : p.estado === 'ATRASO' || p.estado === 'VENCIDO'
                             ? 'bg-rose-100 text-rose-800' 
                             : 'bg-slate-100 text-slate-600'
                         }`}>
-                          {p.estado}
+                          {p.estado === 'EN CURSO' ? `EN CURSO (${p.cuotasPagadas || 0}/${p.plazo || 12} PAGADAS)` : p.estado}
                         </span>
                       </td>
                       <td className="p-3 text-center">
@@ -488,6 +711,259 @@ export default function PrestamosPage({
           </div>
         </div>
       </div>
+
+      {/* Modal: Cargar Préstamo Anterior en Curso (Migración de Cartera) */}
+      {isMigrarModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 my-auto">
+            {/* Header con gradiente azul */}
+            <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white px-6 py-4 flex justify-between items-center">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <History className="w-5 h-5 text-blue-200" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm tracking-wide uppercase">Cargar Préstamo Anterior en Curso</h3>
+                  <p className="text-[11px] text-blue-200">Migración de crédito vigente otorgado en meses pasados</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setIsMigrarModalOpen(false); setMigrarSelectedSocio(null); setMigrarSocioSearch(''); }} 
+                className="text-blue-200 hover:text-white cursor-pointer text-xl font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAprobarMigracion} className="p-6 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
+              {/* Alerta informativa de no egreso */}
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl flex items-start space-x-2.5 text-blue-950">
+                <ShieldCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <strong className="block font-black text-blue-900">Operación Segura para Caja:</strong>
+                  <span>
+                    Este registro <strong>NO genera ningún egreso ni desembolso de dinero hoy</strong> en Caja 4. Solo registrará el saldo restante del socio y creará automáticamente en ventanilla las cuotas faltantes por cobrar a partir de septiembre.
+                  </span>
+                </div>
+              </div>
+
+              {/* Selector de Socio */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+                <label className="block font-black text-slate-800 uppercase text-[11px]">
+                  1. Socio Prestatario (Buscar por Móvil, Nombre o CI) *
+                </label>
+
+                {!migrarSelectedSocio ? (
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Escribe número de móvil, nombre o CI..."
+                      value={migrarSocioSearch}
+                      onChange={(e) => setMigrarSocioSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+
+                    {migrarSocioSearch.trim() && (
+                      <div className="absolute left-0 right-0 top-11 bg-white border border-slate-200 rounded-xl shadow-xl max-h-44 overflow-y-auto z-20 divide-y divide-slate-100">
+                        {migrarSociosFiltrados.length > 0 ? (
+                          migrarSociosFiltrados.map((s) => (
+                            <div
+                              key={s.id}
+                              onClick={() => { setMigrarSelectedSocio(s); setMigrarSocioSearch(''); }}
+                              className="p-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center transition"
+                            >
+                              <div>
+                                <div className="font-extrabold text-slate-900">
+                                  Móvil #{s.nroMovil || s.id} • {s.nombres} {s.apPaterno} {s.apMaterno || ''}
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-mono">
+                                  CI: {s.ci} | Cel: {s.celular || 'S/N'}
+                                </div>
+                              </div>
+                              <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                {s.categoria}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-3 text-center text-slate-400 font-medium">
+                            No se encontró ningún socio con "{migrarSocioSearch}"
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white p-3 rounded-xl border-2 border-blue-300 flex justify-between items-center">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-9 h-9 rounded-full bg-blue-800 text-white font-black flex items-center justify-center text-xs">
+                        #{migrarSelectedSocio.nroMovil || migrarSelectedSocio.id}
+                      </div>
+                      <div>
+                        <div className="font-black text-slate-900 text-xs">
+                          {migrarSelectedSocio.nombres} {migrarSelectedSocio.apPaterno} {migrarSelectedSocio.apMaterno || ''}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          CI: {migrarSelectedSocio.ci} • Cel: {migrarSelectedSocio.celular || 'S/N'} • {migrarSelectedSocio.categoria}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMigrarSelectedSocio(null)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-red-700 hover:bg-red-50 cursor-pointer"
+                      title="Cambiar socio"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Folio o N° Contrato Histórico */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  2. N° de Contrato o Folio Anterior (Opcional):
+                </label>
+                <input
+                  type="text"
+                  value={migrarFolio}
+                  onChange={(e) => setMigrarFolio(e.target.value)}
+                  placeholder="Ej: PR-2026-0012 o Contrato N° 15..."
+                  className="w-full p-2.5 border border-slate-300 rounded-xl font-mono text-xs font-bold text-slate-900"
+                />
+              </div>
+
+              {/* Condiciones Originales del Crédito */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Monto Original (Bs) *</label>
+                  <input
+                    type="number"
+                    step="100"
+                    min="100"
+                    required
+                    value={migrarMontoOriginal}
+                    onChange={(e) => setMigrarMontoOriginal(parseFloat(e.target.value) || 0)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl font-mono font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Plazo Total (Meses) *</label>
+                  <input
+                    type="number"
+                    min="2"
+                    max="60"
+                    required
+                    value={migrarPlazoTotal}
+                    onChange={(e) => setMigrarPlazoTotal(parseInt(e.target.value) || 1)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl font-bold bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tasa Anual (%)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={migrarTasaAnual}
+                    onChange={(e) => setMigrarTasaAnual(parseFloat(e.target.value) || 0)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl font-bold font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Cuotas ya canceladas y Primer Vencimiento Pendiente */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200">
+                <div>
+                  <label className="block font-black text-amber-950 mb-1">
+                    Cuotas YA Canceladas Anteriormente:
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={Math.max(0, migrarPlazoTotal - 1)}
+                    value={migrarCuotasPagadas}
+                    onChange={(e) => setMigrarCuotasPagadas(Math.min(parseInt(e.target.value) || 0, migrarPlazoTotal - 1))}
+                    className="w-full p-2.5 bg-white border border-amber-300 rounded-xl font-black font-mono text-base text-amber-900"
+                  />
+                  <span className="text-[10px] text-amber-700 block mt-1">
+                    Ej: Si pagó hasta agosto, escribe 8.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block font-black text-amber-950 mb-1">
+                    Fecha Próxima Cuota Pendiente:
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={migrarFechaPrimerVenc}
+                    onChange={(e) => setMigrarFechaPrimerVenc(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-amber-300 rounded-xl font-bold text-slate-900 cursor-pointer"
+                  />
+                  <span className="text-[10px] text-amber-700 block mt-1">
+                    Fecha en que debe pagar en septiembre.
+                  </span>
+                </div>
+              </div>
+
+              {/* Resumen en tiempo real del cálculo */}
+              <div className="bg-slate-900 text-white p-4 rounded-2xl space-y-2 font-mono">
+                <div className="flex justify-between items-center text-[11px] border-b border-slate-800 pb-1.5 font-sans">
+                  <span className="text-slate-400">Cuota Mensual Fija Calculada:</span>
+                  <span className="font-bold text-white text-sm font-mono">Bs {migrarCalc.cuotaMensual.toFixed(2)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 font-sans block text-[10px]">Cuotas Pagadas (Históricas):</span>
+                    <strong className="text-emerald-400 font-bold">{migrarCuotasPagadas} cuotas (No se cobran)</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-sans block text-[10px]">Cuotas Faltantes (A Programar):</span>
+                    <strong className="text-amber-300 font-black text-xs">{migrarCalc.cuotasPendientes} cuotas pendientes</strong>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1.5 border-t border-slate-800">
+                  <div>
+                    <span className="text-slate-400 font-sans block text-[10px]">Saldo Capital Restante:</span>
+                    <strong className="text-white font-bold text-xs">Bs {migrarCalc.capitalPendiente.toFixed(2)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-emerald-400 font-sans block text-[10px]">Desembolso en Caja 4 Hoy:</span>
+                    <strong className="text-emerald-400 font-black text-xs">Bs 0.00 (Protegida)</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="pt-2 flex items-center justify-end space-x-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsMigrarModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!migrarSelectedSocio || migrarCuotasPagadas >= migrarPlazoTotal}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black shadow-md flex items-center space-x-2 transition ${
+                    migrarSelectedSocio && migrarCuotasPagadas < migrarPlazoTotal
+                      ? 'bg-blue-700 hover:bg-blue-800 text-white cursor-pointer active:scale-95'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>REGISTRAR Y CREAR CUOTAS PENDIENTES</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Otorgar y Desembolsar Préstamo Directo */}
       {isNewLoanModalOpen && (
@@ -769,9 +1245,11 @@ export default function PrestamosPage({
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {(activePlanData?.planPagos || currentCalc.planPagos).map((p) => (
-                      <tr key={p.nro} className="hover:bg-slate-50">
+                      <tr key={p.nro} className={`hover:bg-slate-50 ${p.pagado ? 'bg-emerald-50/40' : ''}`}>
                         <td className="p-2 text-center font-bold text-slate-500">{p.nro}</td>
-                        <td className="p-2 text-center font-bold text-red-700 bg-red-50/50">{p.fechaLimite || 'Por definir'}</td>
+                        <td className={`p-2 text-center font-bold ${p.pagado ? 'text-emerald-700 font-extrabold' : 'text-red-700 bg-red-50/50'}`}>
+                          {p.pagado ? '✓ CANCELADO (HISTÓRICO)' : (p.fechaLimite || 'Por definir')}
+                        </td>
                         <td className="p-2 text-right font-bold text-slate-900">{p.cuota.toFixed(2)}</td>
                         <td className="p-2 text-right text-emerald-700 font-semibold">{p.capital.toFixed(2)}</td>
                         <td className="p-2 text-right text-amber-700 font-semibold">{p.interes.toFixed(2)}</td>

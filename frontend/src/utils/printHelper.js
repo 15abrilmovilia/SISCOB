@@ -118,9 +118,9 @@ export function generatePlanDePagosHTML(planData) {
   const totalPagar = totalCapital + totalInteres;
 
   const rowsHTML = planPagos.map(p => `
-    <tr style="border-bottom: 1px solid #cbd5e1; font-family: 'JetBrains Mono', monospace; font-size: 11px;">
+    <tr style="border-bottom: 1px solid #cbd5e1; font-family: 'JetBrains Mono', monospace; font-size: 11px; ${p.pagado ? 'background-color: #f0fdf4;' : ''}">
       <td style="padding: 6px 8px; text-align: center; font-weight: bold; color: #475569;">${p.nro}</td>
-      <td style="padding: 6px 8px; text-align: center; font-weight: 700; color: #b91c1c;">${p.fechaLimite || 'Por definir'}</td>
+      <td style="padding: 6px 8px; text-align: center; font-weight: 700; color: ${p.pagado ? '#059669' : '#b91c1c'};">${p.pagado ? '✓ CANCELADO (HISTÓRICO)' : (p.fechaLimite || 'Por definir')}</td>
       <td style="padding: 6px 8px; text-align: right; font-weight: 800; color: #0f172a;">Bs ${p.cuota.toFixed(2)}</td>
       <td style="padding: 6px 8px; text-align: right; color: #059669; font-weight: 600;">Bs ${p.capital.toFixed(2)}</td>
       <td style="padding: 6px 8px; text-align: right; color: #d97706; font-weight: 600;">Bs ${p.interes.toFixed(2)}</td>
