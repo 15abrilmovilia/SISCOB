@@ -15,9 +15,14 @@ import {
   X, 
   AlertCircle,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Tag,
+  Edit3,
+  Info
 } from 'lucide-react';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
+import { INITIAL_CONCEPTOS } from '../data/mockData';
+import ConceptoModal from '../components/ConceptoModal';
 
 const CFG_KEYS = {
   GRUPOS_INGRESO: 'siscob_cfg_grupos_ingreso',
@@ -30,11 +35,11 @@ const CFG_KEYS = {
 };
 
 const DEFAULT_GRUPOS_INGRESO = [
-  { id: 'gi-1', codigo: 'ING-01', nombre: 'Aportes de Sostenimiento y Radio', conceptosCount: 4, orden: 1 },
-  { id: 'gi-2', codigo: 'ING-02', nombre: 'Servicios de Monitoreo GPS', conceptosCount: 2, orden: 2 },
-  { id: 'gi-3', codigo: 'ING-03', nombre: 'Multas y Sanciones Disciplinarias', conceptosCount: 5, orden: 3 },
-  { id: 'gi-4', codigo: 'ING-04', nombre: 'Cartera y Amortización de Préstamos', conceptosCount: 2, orden: 4 },
-  { id: 'gi-5', codigo: 'ING-05', nombre: 'Venta de Insumos y Repuestos Almacén', conceptosCount: 6, orden: 5 },
+  { id: 'gi-1', codigo: 'ING-01', nombre: 'Caja 1: Cuotas de Frecuencia y Aportes Ordinarios', conceptosCount: 6, orden: 1 },
+  { id: 'gi-2', codigo: 'ING-02', nombre: 'Caja 2: Multas y Sanciones Disciplinarias', conceptosCount: 4, orden: 2 },
+  { id: 'gi-3', codigo: 'ING-03', nombre: 'Caja 3: Nuevos Socios e Inscripciones', conceptosCount: 1, orden: 3 },
+  { id: 'gi-4', codigo: 'ING-04', nombre: 'Caja 4: Cartera y Amortización de Préstamos', conceptosCount: 1, orden: 4 },
+  { id: 'gi-5', codigo: 'ING-05', nombre: 'Caja 5: Frecuencia Conductores Inquilinos', conceptosCount: 1, orden: 5 },
 ];
 
 const DEFAULT_GRUPOS_EGRESO = [
@@ -101,17 +106,77 @@ const DEFAULT_TIPO_CAMBIO = {
   ]
 };
 
-export default function ConfigPage({ printMode, setPrintMode, currentUser }) {
+export default function ConfigPage({ 
+  printMode, 
+  setPrintMode, 
+  currentUser,
+  conceptos: propConceptos,
+  setConceptos: propSetConceptos,
+  onNavigateTab
+}) {
   const [activeSubTab, setActiveSubTab] = useState('agrupar');
 
-  // Persisted States
-  const [gruposIngreso, setGruposIngreso] = useState(() => loadFromStorage(CFG_KEYS.GRUPOS_INGRESO, DEFAULT_GRUPOS_INGRESO));
+  // Persisted States con sanitización automática de Agrupadores de Ingreso
+  const [gruposIngreso, setGruposIngreso] = useState(() => {
+    const loaded = loadFromStorage(CFG_KEYS.GRUPOS_INGRESO, null);
+    if (!loaded || !Array.isArray(loaded) || loaded.length === 0 || !loaded.some(g => g.codigo === 'ING-01') || loaded.some(g => (g.nombre || '').includes('Sostenimiento') || (g.nombre || '').includes('GPS'))) {
+      return DEFAULT_GRUPOS_INGRESO;
+    }
+    return loaded;
+  });
   const [gruposEgreso, setGruposEgreso] = useState(() => loadFromStorage(CFG_KEYS.GRUPOS_EGRESO, DEFAULT_GRUPOS_EGRESO));
   const [unidades, setUnidades] = useState(() => loadFromStorage(CFG_KEYS.UNIDADES, DEFAULT_UNIDADES));
   const [productos, setProductos] = useState(() => loadFromStorage(CFG_KEYS.PRODUCTOS, DEFAULT_PRODUCTOS));
   const [categoriasCobro, setCategoriasCobro] = useState(() => loadFromStorage(CFG_KEYS.CATEGORIAS, DEFAULT_CATEGORIAS));
   const [parametros, setParametros] = useState(() => loadFromStorage(CFG_KEYS.PARAMETROS, DEFAULT_PARAMETROS));
   const [tipoCambio, setTipoCambio] = useState(() => loadFromStorage(CFG_KEYS.TIPO_CAMBIO, DEFAULT_TIPO_CAMBIO));
+
+  // Conceptos de Cobro en Ventanilla
+  const [localConceptos, setLocalConceptos] = useState(() => {
+    const loaded = loadFromStorage('siscob_conceptos', null);
+    if (!loaded || !Array.isArray(loaded) || loaded.length === 0) {
+      return INITIAL_CONCEPTOS;
+    }
+    return loaded;
+  });
+
+  const conceptos = propConceptos !== undefined ? propConceptos : localConceptos;
+  const setConceptos = propSetConceptos || setLocalConceptos;
+
+  const [isConceptoModalOpen, setIsConceptoModalOpen] = useState(false);
+  const [editingConcepto, setEditingConcepto] = useState(null);
+
+  const handleOpenCrearConcepto = () => {
+    setEditingConcepto(null);
+    setIsConceptoModalOpen(true);
+  };
+
+  const handleOpenEditarConcepto = (c) => {
+    setEditingConcepto(c);
+    setIsConceptoModalOpen(true);
+  };
+
+  const handleSaveConcepto = (savedItem) => {
+    const existe = conceptos.some(c => c.id === savedItem.id);
+    if (existe) {
+      setConceptos(prev => prev.map(c => c.id === savedItem.id ? savedItem : c));
+    } else {
+      setConceptos(prev => [savedItem, ...prev]);
+    }
+    showToast(`Concepto "${savedItem.nombre}" guardado con éxito.`);
+  };
+
+  const handleEliminarConcepto = (c) => {
+    if (c.id === 'con-1' || c.id === 'con-8') {
+      alert('La Cuota de Frecuencia Oficial es la base del sistema y no puede ser eliminada.');
+      return;
+    }
+
+    if (window.confirm(`¿Está seguro de eliminar el concepto "${c.nombre}" del catálogo?`)) {
+      setConceptos(prev => prev.filter(item => item.id !== c.id));
+      showToast(`Concepto "${c.nombre}" eliminado.`);
+    }
+  };
 
   // Sync with LocalStorage
   useEffect(() => { saveToStorage(CFG_KEYS.GRUPOS_INGRESO, gruposIngreso); }, [gruposIngreso]);
@@ -121,6 +186,7 @@ export default function ConfigPage({ printMode, setPrintMode, currentUser }) {
   useEffect(() => { saveToStorage(CFG_KEYS.CATEGORIAS, categoriasCobro); }, [categoriasCobro]);
   useEffect(() => { saveToStorage(CFG_KEYS.PARAMETROS, parametros); }, [parametros]);
   useEffect(() => { saveToStorage(CFG_KEYS.TIPO_CAMBIO, tipoCambio); }, [tipoCambio]);
+  useEffect(() => { saveToStorage('siscob_conceptos', conceptos); }, [conceptos]);
 
   // Notifications Toast
   const [toastMessage, setToastMessage] = useState(null);
@@ -346,6 +412,18 @@ export default function ConfigPage({ printMode, setPrintMode, currentUser }) {
           </button>
 
           <button
+            onClick={() => setActiveSubTab('conceptos_cobro')}
+            className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl transition cursor-pointer ${
+              activeSubTab === 'conceptos_cobro'
+                ? 'bg-red-700 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            <span>Conceptos de Cobro en Caja</span>
+          </button>
+
+          <button
             onClick={() => setActiveSubTab('unidades')}
             className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl transition cursor-pointer ${
               activeSubTab === 'unidades'
@@ -411,7 +489,39 @@ export default function ConfigPage({ printMode, setPrintMode, currentUser }) {
       {/* SUBVENTANA 1: AGRUPAR INGRESOS + EGRESOS */}
       {/* ========================================================================= */}
       {activeSubTab === 'agrupar' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="space-y-4">
+          {/* Banner explicativo y acceso directo a Conceptos de Cobro */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-start space-x-3">
+              <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-xs shrink-0">
+                <Info className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider bg-blue-200 text-blue-900 px-2 py-0.5 rounded-md">
+                    GUÍA RÁPIDA
+                  </span>
+                </div>
+                <h4 className="text-sm font-extrabold text-blue-950">
+                  ¿Buscando dónde crear o modificar conceptos de cobro (Logotipos, Donaciones, Frecuencias)?
+                </h4>
+                <p className="text-xs text-blue-800 leading-relaxed">
+                  Las tablas de aquí abajo son los <strong>Agrupadores Contables Generales</strong> (Cajas 1 a 5). 
+                  Para <strong>crear conceptos nuevos, cambiarles el nombre o definir sus montos en Bs</strong>, vaya a la pestaña <strong>"Conceptos de Cobro en Caja"</strong> o haga clic en el botón de la derecha.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('conceptos_cobro')}
+              className="flex items-center justify-center space-x-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-xs transition shrink-0 cursor-pointer"
+            >
+              <Tag className="w-4 h-4" />
+              <span>Ver Conceptos de Cobro</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {/* Grupos de Ingresos */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
             <div className="flex justify-between items-center border-b pb-2">
@@ -536,6 +646,111 @@ export default function ConfigPage({ printMode, setPrintMode, currentUser }) {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBVENTANA: CONCEPTOS DE COBRO EN CAJA */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'conceptos_cobro' && (
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-4 gap-3">
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="p-1.5 bg-red-100 text-red-700 rounded-lg">
+                  <Tag className="w-4 h-4" />
+                </span>
+                <h3 className="font-extrabold text-slate-900 text-base uppercase">
+                  Catálogo Oficial de Conceptos de Cobro
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Aquí puede <strong>crear nuevos conceptos</strong> o <strong>modificar el nombre, caja destino y monto</strong> de los cobros en ventanilla y Kardex de socios e inquilinos.
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleOpenCrearConcepto}
+                className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Nuevo Concepto de Ingreso</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tabla de Conceptos */}
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="p-3">Nombre del Concepto</th>
+                  <th className="p-3">Caja Destino</th>
+                  <th className="p-3">Tipo</th>
+                  <th className="p-3">Periodicidad</th>
+                  <th className="p-3 text-right">Monto Sugerido</th>
+                  <th className="p-3 text-center">Estado</th>
+                  <th className="p-3 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-sans">
+                {conceptos.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50 transition">
+                    <td className="p-3">
+                      <span className="font-bold text-slate-900 uppercase">{c.nombre}</span>
+                      {c.descripcion && <div className="text-[10px] text-slate-400 font-medium mt-0.5">{c.descripcion}</div>}
+                    </td>
+                    <td className="p-3">
+                      <span className="px-2.5 py-1 rounded-md font-bold text-[10px] bg-blue-50 text-blue-800 border border-blue-200">
+                        {c.cajaNombre || (c.cajaId === 'c1' ? 'CAJA 1: FRECUENCIA' : (c.cajaId === 'c2' ? 'CAJA 2: MULTAS' : (c.cajaId === 'c3' ? 'CAJA 3: NUEVOS SOCIOS' : (c.cajaId === 'c4' ? 'CAJA 4: PRÉSTAMOS' : 'CAJA 5: INQUILINOS'))))}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        c.tipo === 'Multa' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}>
+                        {c.tipo || 'Cobro'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-slate-600 font-medium">
+                      {c.periodicidad || 'A demanda / Ventanilla'}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-slate-900">
+                      {c.monto > 0 ? `Bs ${parseFloat(c.monto).toFixed(2)}` : <span className="text-slate-400 font-normal italic">Variable</span>}
+                    </td>
+                    <td className="p-3 text-center">
+                      <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                        ACTIVO
+                      </span>
+                    </td>
+                    <td className="p-3 text-center">
+                      <div className="flex items-center justify-center space-x-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditarConcepto(c)}
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition cursor-pointer flex items-center space-x-1 border border-blue-200"
+                          title="Modificar nombre, caja o monto"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold">Editar</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarConcepto(c)}
+                          className="p-1 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-700 rounded-lg transition cursor-pointer border border-slate-200"
+                          title="Eliminar concepto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -1321,6 +1536,14 @@ export default function ConfigPage({ printMode, setPrintMode, currentUser }) {
           </div>
         </div>
       )}
+
+      {/* Modal para Crear y Modificar Conceptos de Ingreso */}
+      <ConceptoModal
+        isOpen={isConceptoModalOpen}
+        onClose={() => setIsConceptoModalOpen(false)}
+        onSave={handleSaveConcepto}
+        initialData={editingConcepto}
+      />
     </div>
   );
 }
