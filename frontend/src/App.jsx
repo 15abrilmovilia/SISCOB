@@ -53,6 +53,22 @@ import {
   createDeudaAPI
 } from './utils/api';
 
+// Sanitizador para asegurar que la única obligación mensual sea la Cuota de Frecuencia
+function sanitizeSocioObligaciones(socioList) {
+  if (!Array.isArray(socioList)) return socioList;
+  return socioList.map(s => {
+    const isInq = s.categoria === 'Inquilino';
+    const desc = isInq ? 'FRECUENCIA DE CONDUCTORES INQUILINOS' : 'CUOTA FRECUENCIA MENSUAL SOCIOS';
+    const monto = isInq ? 250.0 : 200.0;
+    return {
+      ...s,
+      obligaciones: [
+        { nombre: desc, monto, periodicidad: "Mensual" }
+      ]
+    };
+  });
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => 
     loadFromStorage(STORAGE_KEYS.USER, null)
@@ -64,9 +80,9 @@ export default function App() {
   const [socios, setSocios] = useState(() => {
     const loaded = loadFromStorage(STORAGE_KEYS.SOCIOS, null);
     if (!loaded || !Array.isArray(loaded) || loaded.length === 0) {
-      return INITIAL_SOCIOS;
+      return sanitizeSocioObligaciones(INITIAL_SOCIOS);
     }
-    return loaded;
+    return sanitizeSocioObligaciones(loaded);
   });
   const [deudas, setDeudas] = useState(() => {
     const loaded = loadFromStorage(STORAGE_KEYS.DEUDAS, null);
@@ -109,7 +125,7 @@ export default function App() {
           getEgresosAPI(),
           getUsuariosAPI()
         ]);
-        if (Array.isArray(cloudSocios) && cloudSocios.length > 0) setSocios(cloudSocios);
+        if (Array.isArray(cloudSocios) && cloudSocios.length > 0) setSocios(sanitizeSocioObligaciones(cloudSocios));
         if (Array.isArray(cloudCajas) && cloudCajas.length > 0) setCajas(cloudCajas);
         if (Array.isArray(cloudDeudas) && cloudDeudas.length > 0) {
           // Si la cartera de préstamos está vacía, no importar cuotas huérfanas de préstamos de prueba
@@ -327,27 +343,6 @@ export default function App() {
         descripcion: `${desc} - ${mesActual}`,
         periodo: mesActual,
         monto,
-        pagado: false,
-        fecha: fechaHoy,
-        fechaVencimiento: fechaHoy,
-        moneda: 'Bs',
-        cantidad: 1
-      };
-      nuevasDeudasGeneradas.push(deudaItem);
-      createDeudaAPI(deudaItem).catch(() => {});
-    }
-
-    if (newData.cuotaInscripcion) {
-      finalSocio.obligaciones.push({ nombre: "PAGO DE NUEVOS SOCIOS (INSCRIPCIÓN)", monto: 500.0, periodicidad: "Única" });
-
-      const deudaItem = {
-        id: `d-${Date.now()}-insc`,
-        socioId: finalId,
-        conceptoId: 6, // Caja 3 - Pago Nuevos Socios
-        cajaId: 'c3',
-        descripcion: 'PAGO DE NUEVOS SOCIOS (INSCRIPCIÓN)',
-        periodo: 'Ingreso',
-        monto: 500.0,
         pagado: false,
         fecha: fechaHoy,
         fechaVencimiento: fechaHoy,

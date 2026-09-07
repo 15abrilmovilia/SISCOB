@@ -4,11 +4,14 @@ import {
   Plus, 
   Users, 
   AlertCircle, 
-  ShieldAlert
+  ShieldAlert,
+  Zap,
+  CalendarCheck
 } from 'lucide-react';
 import { createDeudaAPI } from '../utils/api';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import AsignarCuotaModal from '../components/AsignarCuotaModal';
+import GenerarFrecuenciaModal from '../components/GenerarFrecuenciaModal';
 
 const INITIAL_CONCEPTOS = [
   { id: 'con-1', cajaId: 'c1', cajaNombre: 'CAJA DE FRECUENCIA', nombre: 'CUOTA FRECUENCIA MENSUAL SOCIOS', tipo: 'Mensualidad', monto: 200.0, periodicidad: 'Mensual', sociosAfectados: 206, descripcion: 'Se genera cada mes a todos los números móvil' },
@@ -24,6 +27,7 @@ const INITIAL_CONCEPTOS = [
 export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isIndividualModalOpen, setIsIndividualModalOpen] = useState(false);
+  const [isGenerarFrecuenciaOpen, setIsGenerarFrecuenciaOpen] = useState(false);
   
   // Conceptos vigentes con persistencia
   const [conceptos, setConceptos] = useState(() => {
@@ -210,7 +214,14 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
             Gestión de cargos periódicos, multas disciplinarias y asignación directa o masiva a socios
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setIsGenerarFrecuenciaOpen(true)}
+            className="flex items-center space-x-1.5 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-xs transition cursor-pointer border border-red-900/30 hover:shadow-md"
+          >
+            <Zap className="w-4 h-4 text-amber-300" />
+            <span>Generar Frecuencias del Mes</span>
+          </button>
           <button
             onClick={() => setIsIndividualModalOpen(true)}
             className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3.5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer border border-slate-200"
@@ -220,10 +231,10 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
           </button>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
+            className="flex items-center space-x-1.5 bg-slate-900 hover:bg-black text-white px-3.5 py-2.5 rounded-xl text-xs font-black shadow-xs transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Nuevo Cargo Masivo</span>
+            <span>Otro Cargo Masivo</span>
           </button>
         </div>
       </div>
@@ -258,22 +269,23 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
           </div>
         </div>
 
-        {/* Red Action Card */}
+        {/* Red Action Card: Generar Frecuencia Mensual */}
         <div 
-          onClick={() => setIsModalOpen(true)}
-          className="md:col-span-4 bg-gradient-to-br from-red-700 to-red-900 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md transition group"
+          onClick={() => setIsGenerarFrecuenciaOpen(true)}
+          className="md:col-span-4 bg-gradient-to-br from-red-700 via-red-800 to-red-950 text-white p-5 rounded-2xl shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md transition group border border-red-800/40"
         >
           <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-red-200 block mb-1">
-              APLICACIÓN INMEDIATA
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 flex items-center space-x-1 mb-1">
+              <Zap className="w-3.5 h-3.5" />
+              <span>OBLIGACIÓN MENSUAL OFICIAL</span>
             </span>
-            <h3 className="text-lg font-extrabold leading-snug">Asignar Cargo Masivo a Socios</h3>
+            <h3 className="text-lg font-extrabold leading-snug">Generar Frecuencias del Mes</h3>
             <p className="text-xs text-red-100 mt-1">
-              Aplica cuotas o multas a toda la categoría o padrón con selector doble interactivo.
+              Emite automáticamente las cuotas oficiales (Bs 200 Propietarios / Bs 250 Inquilinos) con protección contra duplicados.
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-red-600/50 flex justify-between items-center text-xs font-bold text-white group-hover:translate-x-1 transition-transform">
-            <span>Iniciar Asignación Masiva</span>
+            <span className="text-amber-200 font-extrabold">Abrir Generador Mensual</span>
             <span>→</span>
           </div>
         </div>
@@ -310,8 +322,21 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
               {conceptos.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50 transition">
                   <td className="p-3">
-                    <div className="font-bold text-slate-900 uppercase">{c.nombre}</div>
-                    {c.descripcion && <div className="text-[10px] text-slate-400 font-medium">{c.descripcion}</div>}
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-slate-900 uppercase">{c.nombre}</span>
+                      {(c.cajaId === 'c1' || c.cajaId === 'c5' || (c.nombre && c.nombre.includes('FRECUENCIA'))) && (
+                        <button
+                          type="button"
+                          onClick={() => setIsGenerarFrecuenciaOpen(true)}
+                          className="px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-800 rounded font-black text-[10px] inline-flex items-center space-x-1 cursor-pointer transition shadow-2xs"
+                          title="Generar masivamente este mes"
+                        >
+                          <Zap className="w-3 h-3 text-red-700" />
+                          <span>Generar Mes</span>
+                        </button>
+                      )}
+                    </div>
+                    {c.descripcion && <div className="text-[10px] text-slate-400 font-medium mt-0.5">{c.descripcion}</div>}
                   </td>
                   <td className="p-3">
                     <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-blue-50 text-blue-800 border border-blue-200">
@@ -581,6 +606,15 @@ export default function CuotasPage({ socios = [], deudas = [], setDeudas }) {
         isOpen={isIndividualModalOpen}
         onClose={() => setIsIndividualModalOpen(false)}
         socios={socios}
+        setDeudas={setDeudas}
+      />
+
+      {/* Modal de Generación Mensual Automática de Frecuencias */}
+      <GenerarFrecuenciaModal
+        isOpen={isGenerarFrecuenciaOpen}
+        onClose={() => setIsGenerarFrecuenciaOpen(false)}
+        socios={socios}
+        deudas={deudas}
         setDeudas={setDeudas}
       />
     </div>

@@ -14,8 +14,7 @@ export default function NewSocioModal({ isOpen, onClose, onSave }) {
     fechaIngreso: new Date().toISOString().split('T')[0],
     categoria: 'Propietario',
     observaciones: '',
-    cuotaFrecuencia: true,
-    cuotaInscripcion: true
+    cuotaFrecuencia: true
   });
 
   if (!isOpen) return null;
@@ -172,13 +171,13 @@ export default function NewSocioModal({ isOpen, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Obligaciones Iniciales Oficiales */}
-          <div className="bg-red-50/50 p-3 rounded-xl border border-red-200/60 space-y-2">
+          {/* Única Obligación Mensual Oficial */}
+          <div className="bg-red-50/60 p-3 rounded-xl border border-red-200/80 space-y-2">
             <span className="block font-extrabold text-red-950 text-[11px] uppercase tracking-wider">
-              Obligaciones Iniciales Asignadas (Valores Oficiales):
+              Única Obligación Mensual Asignada:
             </span>
             <div className="space-y-1.5">
-              <label className="flex items-center space-x-2 cursor-pointer font-medium text-slate-800">
+              <label className="flex items-center space-x-2 cursor-pointer font-bold text-slate-900">
                 <input
                   type="checkbox"
                   checked={formData.cuotaFrecuencia}
@@ -187,19 +186,13 @@ export default function NewSocioModal({ isOpen, onClose, onSave }) {
                 />
                 <span>
                   {formData.categoria === 'Inquilino' 
-                    ? 'Frecuencia de Conductores Inquilinos (Bs 250.00)' 
-                    : 'Cuota Frecuencia Mensual Socios (Bs 200.00)'}
+                    ? 'Frecuencia de Conductores Inquilinos (Bs 250.00 / mes)' 
+                    : 'Cuota Frecuencia Mensual Socios (Bs 200.00 / mes)'}
                 </span>
               </label>
-              <label className="flex items-center space-x-2 cursor-pointer font-medium text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={formData.cuotaInscripcion}
-                  onChange={(e) => setFormData({ ...formData, cuotaInscripcion: e.target.checked })}
-                  className="rounded text-red-600 focus:ring-red-500 w-4 h-4"
-                />
-                <span>Aporte de Inscripción Nuevo Socio (Bs 500.00)</span>
-              </label>
+              <p className="text-[10px] text-slate-500 pl-6 leading-tight">
+                La frecuencia mensual es la única obligación periódica que se genera mes a mes en la cooperativa.
+              </p>
             </div>
           </div>
 
