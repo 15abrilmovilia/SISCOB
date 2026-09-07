@@ -611,6 +611,8 @@ app.post('/api/deudas', async (req, res) => {
     }
   }
   res.status(201).json({ id: `d${Date.now()}`, ...req.body, pagado: false });
+});
+
 // Endpoint para eliminar todas las cuotas de préstamos huérfanas o de prueba
 app.delete('/api/deudas/prestamos', async (req, res) => {
   if (pool) {
