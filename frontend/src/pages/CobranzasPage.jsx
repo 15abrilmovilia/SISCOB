@@ -31,14 +31,13 @@ const INITIAL_HISTORIAL_RECIBOS = [
     socioNombre: 'REMBERTO TORRICO VARGAS',
     socioCI: '4414561',
     socioCelular: '7141199',
-    totalBs: 480.0,
+    totalBs: 200.0,
     totalSus: 0,
     metodoPago: 'Efectivo',
     cajaId: 'c1',
-    cajaNombre: 'CAJA GENERAL (EFECTIVO)',
+    cajaNombre: 'CAJA DE FRECUENCIA',
     items: [
-      { id: 'd-seed-1', descripcion: 'Cuota Sostenimiento Mensual', monto: 400.0, periodo: 'Agosto 2026' },
-      { id: 'd-seed-2', descripcion: 'Mantenimiento GPS', monto: 80.0, periodo: 'Agosto 2026' }
+      { id: 'd-seed-1', descripcion: 'CUOTA FRECUENCIA MENSUAL SOCIOS', monto: 200.0, periodo: 'Agosto 2026' }
     ],
     estado: 'VIGENTE'
   }

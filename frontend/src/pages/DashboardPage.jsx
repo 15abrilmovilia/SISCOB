@@ -646,11 +646,11 @@ export default function DashboardPage({
             <div className="flex items-center space-x-4">
               <span className="flex items-center space-x-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-700" />
-                <span>Sostenimiento Mensual</span>
+                <span>Cuota de Frecuencia</span>
               </span>
               <span className="flex items-center space-x-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                <span>Mantenimiento GPS</span>
+                <span>Nuevos Socios (Inscripción)</span>
               </span>
               <span className="flex items-center space-x-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />

@@ -14,8 +14,8 @@ export default function NewSocioModal({ isOpen, onClose, onSave }) {
     fechaIngreso: new Date().toISOString().split('T')[0],
     categoria: 'Propietario',
     observaciones: '',
-    cuotaSostenimiento: true,
-    cuotaGPS: true
+    cuotaFrecuencia: true,
+    cuotaInscripcion: true
   });
 
   if (!isOpen) return null;
@@ -172,29 +172,33 @@ export default function NewSocioModal({ isOpen, onClose, onSave }) {
             </div>
           </div>
 
-          {/* Obligaciones Iniciales */}
+          {/* Obligaciones Iniciales Oficiales */}
           <div className="bg-red-50/50 p-3 rounded-xl border border-red-200/60 space-y-2">
             <span className="block font-extrabold text-red-950 text-[11px] uppercase tracking-wider">
-              Obligaciones Iniciales Asignadas:
+              Obligaciones Iniciales Asignadas (Valores Oficiales):
             </span>
             <div className="space-y-1.5">
               <label className="flex items-center space-x-2 cursor-pointer font-medium text-slate-800">
                 <input
                   type="checkbox"
-                  checked={formData.cuotaSostenimiento}
-                  onChange={(e) => setFormData({ ...formData, cuotaSostenimiento: e.target.checked })}
+                  checked={formData.cuotaFrecuencia}
+                  onChange={(e) => setFormData({ ...formData, cuotaFrecuencia: e.target.checked })}
                   className="rounded text-red-600 focus:ring-red-500 w-4 h-4"
                 />
-                <span>Sostenimiento Mensual (Bs 400.00)</span>
+                <span>
+                  {formData.categoria === 'Inquilino' 
+                    ? 'Frecuencia de Conductores Inquilinos (Bs 250.00)' 
+                    : 'Cuota Frecuencia Mensual Socios (Bs 200.00)'}
+                </span>
               </label>
               <label className="flex items-center space-x-2 cursor-pointer font-medium text-slate-800">
                 <input
                   type="checkbox"
-                  checked={formData.cuotaGPS}
-                  onChange={(e) => setFormData({ ...formData, cuotaGPS: e.target.checked })}
+                  checked={formData.cuotaInscripcion}
+                  onChange={(e) => setFormData({ ...formData, cuotaInscripcion: e.target.checked })}
                   className="rounded text-red-600 focus:ring-red-500 w-4 h-4"
                 />
-                <span>Mantenimiento GPS Mensual (Bs 80.00)</span>
+                <span>Aporte de Inscripción Nuevo Socio (Bs 500.00)</span>
               </label>
             </div>
           </div>

@@ -49,7 +49,8 @@ import {
   getEgresosAPI,
   getUsuariosAPI,
   resetSistemaAPI,
-  deleteDeudasPrestamosAPI
+  deleteDeudasPrestamosAPI,
+  createDeudaAPI
 } from './utils/api';
 
 export default function App() {
@@ -296,20 +297,69 @@ export default function App() {
     };
 
     // Guardar en Supabase a través de Railway
-    const createdRemote = await createSocioAPI(newSocioPayload);
+    const finalId = createdRemote?.id || assignedId;
     const finalSocio = {
-      id: createdRemote?.id || assignedId,
+      id: finalId,
       ...newSocioPayload,
       ...(createdRemote || {}),
-      acciones: [{ id: `10${assignedId}`, fecha: newSocioPayload.fechaIngreso, monto: 0.0, estado: "VIG", categoria: newSocioPayload.categoria }],
+      acciones: [{ id: `10${finalId}`, fecha: newSocioPayload.fechaIngreso, monto: 0.0, estado: "VIG", categoria: newSocioPayload.categoria }],
       obligaciones: []
     };
 
-    if (newData.cuotaSostenimiento) {
-      finalSocio.obligaciones.push({ nombre: "Sostenimiento", monto: 400.0, periodicidad: "Mensual" });
+    const nuevasDeudasGeneradas = [];
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    const mesActual = 'Septiembre 2026';
+
+    if (newData.cuotaFrecuencia) {
+      const isInquilino = newData.categoria === 'Inquilino';
+      const monto = isInquilino ? 250.0 : 200.0;
+      const conceptoId = isInquilino ? 8 : 1;
+      const cajaId = isInquilino ? 'c5' : 'c1';
+      const desc = isInquilino ? 'FRECUENCIA DE CONDUCTORES INQUILINOS' : 'CUOTA FRECUENCIA MENSUAL SOCIOS';
+
+      finalSocio.obligaciones.push({ nombre: desc, monto, periodicidad: "Mensual" });
+
+      const deudaItem = {
+        id: `d-${Date.now()}-frec`,
+        socioId: finalId,
+        conceptoId,
+        cajaId,
+        descripcion: `${desc} - ${mesActual}`,
+        periodo: mesActual,
+        monto,
+        pagado: false,
+        fecha: fechaHoy,
+        fechaVencimiento: fechaHoy,
+        moneda: 'Bs',
+        cantidad: 1
+      };
+      nuevasDeudasGeneradas.push(deudaItem);
+      createDeudaAPI(deudaItem).catch(() => {});
     }
-    if (newData.cuotaGPS) {
-      finalSocio.obligaciones.push({ nombre: "Mantenimiento GPS", monto: 80.0, periodicidad: "Mensual" });
+
+    if (newData.cuotaInscripcion) {
+      finalSocio.obligaciones.push({ nombre: "PAGO DE NUEVOS SOCIOS (INSCRIPCIÓN)", monto: 500.0, periodicidad: "Única" });
+
+      const deudaItem = {
+        id: `d-${Date.now()}-insc`,
+        socioId: finalId,
+        conceptoId: 6, // Caja 3 - Pago Nuevos Socios
+        cajaId: 'c3',
+        descripcion: 'PAGO DE NUEVOS SOCIOS (INSCRIPCIÓN)',
+        periodo: 'Ingreso',
+        monto: 500.0,
+        pagado: false,
+        fecha: fechaHoy,
+        fechaVencimiento: fechaHoy,
+        moneda: 'Bs',
+        cantidad: 1
+      };
+      nuevasDeudasGeneradas.push(deudaItem);
+      createDeudaAPI(deudaItem).catch(() => {});
+    }
+
+    if (nuevasDeudasGeneradas.length > 0) {
+      setDeudas(prev => [...nuevasDeudasGeneradas, ...prev]);
     }
 
     setSocios(prev => [finalSocio, ...prev.filter(s => s.id !== finalSocio.id)]);

@@ -64,10 +64,10 @@ const DEFAULT_PRODUCTOS = [
 ];
 
 const DEFAULT_CATEGORIAS = [
-  { id: 'cat-1', codigo: 'PROP', nombre: 'Socio Propietario (1 Móvil)', cuotaSost: 400.0, cuotaGPS: 80.0, moraDias: 10, activos: 145 },
-  { id: 'cat-2', codigo: 'P-MULT', nombre: 'Propietario Flota / Multimóvil', cuotaSost: 350.0, cuotaGPS: 70.0, moraDias: 10, activos: 25 },
-  { id: 'cat-3', codigo: 'INQ', nombre: 'Conductor Inquilino / Relevo', cuotaSost: 150.0, cuotaGPS: 80.0, moraDias: 5, activos: 60 },
-  { id: 'cat-4', codigo: 'ASAL', nombre: 'Conductor Asalariado Fijo', cuotaSost: 100.0, cuotaGPS: 40.0, moraDias: 15, activos: 18 },
+  { id: 'cat-1', codigo: 'PROP', nombre: 'Socio Propietario (1 Móvil)', cuotaSost: 200.0, cuotaGPS: 0.0, moraDias: 10, activos: 145 },
+  { id: 'cat-2', codigo: 'P-MULT', nombre: 'Propietario Flota / Multimóvil', cuotaSost: 200.0, cuotaGPS: 0.0, moraDias: 10, activos: 25 },
+  { id: 'cat-3', codigo: 'INQ', nombre: 'Conductor Inquilino / Relevo', cuotaSost: 250.0, cuotaGPS: 0.0, moraDias: 5, activos: 60 },
+  { id: 'cat-4', codigo: 'ASAL', nombre: 'Conductor Asalariado Fijo', cuotaSost: 200.0, cuotaGPS: 0.0, moraDias: 15, activos: 18 },
   { id: 'cat-5', codigo: 'HON', nombre: 'Socio Honorario / Fundador', cuotaSost: 0.0, cuotaGPS: 0.0, moraDias: 30, activos: 8 },
 ];
 
