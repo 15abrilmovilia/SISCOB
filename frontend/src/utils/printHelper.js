@@ -2,6 +2,8 @@
  * SISCOB - Motor de Impresión Aislada Profesional
  * Imprime documentos limpios directamente sin capturar la ventana, modales ni fondos del navegador.
  */
+import * as XLSX from 'xlsx';
+
 
 export function printIsolatedDocument(htmlContent, title = 'Documento SISCOB') {
   // Eliminar iframes previos si existen
@@ -366,8 +368,6 @@ export function generateReceiptHTML(receiptData, printMode = 'termico') {
     </div>
   `;
 }
-
-import * as XLSX from 'xlsx';
 
 /**
  * Exportador de Tablas a CSV limpio (Compatible al 100% con Excel en Español / Windows)
