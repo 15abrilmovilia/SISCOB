@@ -6,7 +6,9 @@ import * as XLSX from 'xlsx';
 import { LOGO_15_ABRIL_BASE64 } from '../assets/logoBase64';
 
 
-export function printIsolatedDocument(htmlContent, title = 'Documento SISCOB') {
+export function printIsolatedDocument(htmlContent, title = 'Documento SISCOB', options = {}) {
+  const isLandscape = options.landscape || false;
+
   // Eliminar iframes previos si existen
   const oldIframe = document.getElementById('siscob-print-frame');
   if (oldIframe) {
@@ -39,7 +41,7 @@ export function printIsolatedDocument(htmlContent, title = 'Documento SISCOB') {
         <style>
           @page {
             margin: 8mm 10mm;
-            size: auto;
+            size: ${isLandscape ? 'landscape' : 'auto'};
           }
           * {
             box-sizing: border-box;

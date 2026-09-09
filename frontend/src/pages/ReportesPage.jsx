@@ -9,7 +9,13 @@ import {
   AlertTriangle,
   TrendingUp,
   Layers,
-  Database
+  Database,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Calendar,
+  DollarSign,
+  ShieldCheck
 } from 'lucide-react';
 import { printIsolatedDocument, downloadCSV, downloadXLSX } from '../utils/printHelper';
 import { LOGO_15_ABRIL_BASE64 } from '../assets/logoBase64';
@@ -68,6 +74,8 @@ export default function ReportesPage({
   const [reportTab, setReportTab] = useState('recaudados'); // 'recaudados' | 'deudas'
   const [dataSource, setDataSource] = useState('real'); // 'real' | 'historico'
   const [soloConDeuda, setSoloConDeuda] = useState(false);
+  const [filtroMora, setFiltroMora] = useState('TODOS'); // 'TODOS' | 'AL_DIA' | 'REGULAR' | 'CRITICA'
+  const [quickDate, setQuickDate] = useState('anio');
 
   // Shared Filter States (amplio por defecto para cubrir operaciones reales del año 2026)
   const [fechaDesde, setFechaDesde] = useState('2026-01-01');
@@ -77,6 +85,39 @@ export default function ReportesPage({
   const [selectedCaja, setSelectedCaja] = useState('TODAS');
   const [selectedCajero, setSelectedCajero] = useState('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Manejador de rangos rápidos de fecha
+  const handleQuickDateRange = (tipo) => {
+    setQuickDate(tipo);
+    const today = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    if (tipo === 'hoy') {
+      const hoyStr = toISO(today);
+      setFechaDesde(hoyStr);
+      setFechaHasta(hoyStr);
+    } else if (tipo === 'semana') {
+      const cur = new Date(today);
+      const day = cur.getDay(); // 0 Dom, 1 Lun...
+      const diff = cur.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(cur.setDate(diff));
+      setFechaDesde(toISO(monday));
+      setFechaHasta(toISO(today));
+    } else if (tipo === 'este-mes') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      setFechaDesde(toISO(firstDay));
+      setFechaHasta(toISO(today));
+    } else if (tipo === 'mes-anterior') {
+      const firstDayPrev = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastDayPrev = new Date(today.getFullYear(), today.getMonth(), 0);
+      setFechaDesde(toISO(firstDayPrev));
+      setFechaHasta(toISO(lastDayPrev));
+    } else if (tipo === 'anio') {
+      setFechaDesde('2026-01-01');
+      setFechaHasta(toISO(today));
+    }
+  };
 
   // 1. CONSTRUCCIÓN DINÁMICA DE LA MATRIZ REAL DE INGRESOS RECAUDADOS (8 Conceptos Oficiales / 5 Cajas)
   const realIngresos = useMemo(() => {
@@ -311,9 +352,30 @@ export default function ReportesPage({
       const matchSearch = searchTerm === '' || 
         `${item.interno} ${item.nombre}`.toLowerCase().includes(searchTerm.toLowerCase());
       const matchSoloConDeuda = !soloConDeuda || (item.total && item.total > 0);
+
+      // Filtro Semáforo de Morosidad
+      const tot = item.total || 0;
+      if (filtroMora === 'AL_DIA' && tot > 0) return false;
+      if (filtroMora === 'REGULAR' && (tot === 0 || tot > 200)) return false;
+      if (filtroMora === 'CRITICA' && tot <= 200) return false;
+
       return matchCat && matchMoneda && matchCaja && matchSearch && matchSoloConDeuda;
     });
-  }, [activeDeudasList, selectedCategoria, selectedMoneda, selectedCaja, searchTerm, soloConDeuda]);
+  }, [activeDeudasList, selectedCategoria, selectedMoneda, selectedCaja, searchTerm, soloConDeuda, filtroMora]);
+
+  // Contadores para el Semáforo de Morosidad
+  const moraCounts = useMemo(() => {
+    let alDia = 0;
+    let regular = 0;
+    let critica = 0;
+    activeDeudasList.forEach(d => {
+      const tot = d.total || 0;
+      if (tot === 0) alDia++;
+      else if (tot <= 200) regular++;
+      else critica++;
+    });
+    return { alDia, regular, critica, total: activeDeudasList.length };
+  }, [activeDeudasList]);
 
   // Totales Deudas
   const totalsDeudas = useMemo(() => {
@@ -331,6 +393,28 @@ export default function ReportesPage({
     };
   }, [filteredDeudas]);
   const grandTotalDeudas = filteredDeudas.reduce((acc, curr) => acc + (curr.total || 0), 0);
+
+  // 4.1 Resumen Ejecutivo Superior por Cajas Oficiales (5 Cajas + Gran Total)
+  const kpisCajas = useMemo(() => {
+    const isIngresos = reportTab === 'recaudados';
+    const totals = isIngresos ? totalsIngresos : totalsDeudas;
+    const grandTotal = isIngresos ? grandTotalIngresos : grandTotalDeudas;
+
+    const totalCaja1 = totals.cuotaFrecuencia;
+    const totalCaja2 = totals.multaNoTurno + totals.multaArt5 + totals.mentirUbicacion + totals.turnoDomFer;
+    const totalCaja3 = totals.nuevosSocios;
+    const totalCaja4 = totals.prestamos;
+    const totalCaja5 = totals.frecuenciaInquilinos;
+
+    return [
+      { id: 'c1', nombre: 'Caja 1: Frecuencia', sub: 'Socios Propietarios', monto: totalCaja1, dot: 'bg-red-500', isMain: false },
+      { id: 'c2', nombre: 'Caja 2: Multas', sub: 'Infracciones y Turnos', monto: totalCaja2, dot: 'bg-amber-500', isMain: false },
+      { id: 'c3', nombre: 'Caja 3: Nuevos', sub: 'Inscripción Socios', monto: totalCaja3, dot: 'bg-emerald-500', isMain: false },
+      { id: 'c4', nombre: 'Caja 4: Préstamos', sub: 'Cartera y Amortizaciones', monto: totalCaja4, dot: 'bg-blue-500', isMain: false },
+      { id: 'c5', nombre: 'Caja 5: Inquilinos', sub: 'Frecuencia Relevos', monto: totalCaja5, dot: 'bg-purple-500', isMain: false },
+      { id: 'total', nombre: isIngresos ? 'Total Recaudado' : 'Total Cartera Deuda', sub: isIngresos ? 'Ingresos Consolidados' : 'Saldo Pendiente Global', monto: grandTotal, dot: 'bg-white', isMain: true }
+    ];
+  }, [reportTab, totalsIngresos, totalsDeudas, grandTotalIngresos, grandTotalDeudas]);
 
   // 5. EXPORTAR A EXCEL (.xlsx) o CSV (.csv) REAL (Descarga directa con datos reales del sistema)
   const handleExportExcel = (tipo, formato = 'xlsx') => {
@@ -493,7 +577,7 @@ export default function ReportesPage({
       </div>
     `;
 
-    printIsolatedDocument(html, title);
+    printIsolatedDocument(html, title, { landscape: true });
   };
 
   return (
@@ -659,6 +743,108 @@ export default function ReportesPage({
           </div>
         </div>
 
+        {/* Rangos Rápidos de Fecha */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+          <span className="text-[11px] font-black text-slate-500 mr-1 flex items-center gap-1 uppercase tracking-wider">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            Rango Rápido:
+          </span>
+          <button
+            type="button"
+            onClick={() => handleQuickDateRange('hoy')}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer border ${
+              quickDate === 'hoy' ? 'bg-red-700 text-white border-red-700 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+            }`}
+          >
+            Hoy
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickDateRange('semana')}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer border ${
+              quickDate === 'semana' ? 'bg-red-700 text-white border-red-700 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+            }`}
+          >
+            Esta Semana
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickDateRange('este-mes')}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer border ${
+              quickDate === 'este-mes' ? 'bg-red-700 text-white border-red-700 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+            }`}
+          >
+            Este Mes (Septiembre)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickDateRange('mes-anterior')}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer border ${
+              quickDate === 'mes-anterior' ? 'bg-red-700 text-white border-red-700 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+            }`}
+          >
+            Mes Anterior (Agosto)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickDateRange('anio')}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer border ${
+              quickDate === 'anio' ? 'bg-red-700 text-white border-red-700 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+            }`}
+          >
+            Todo el Año 2026
+          </button>
+        </div>
+
+        {/* Semáforo de Morosidad para Deudas */}
+        {reportTab === 'deudas' && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <span className="text-[11px] font-black text-slate-600 uppercase flex items-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+              Semáforo de Morosidad:
+            </span>
+            <button
+              type="button"
+              onClick={() => setFiltroMora('TODOS')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                filtroMora === 'TODOS' ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              Todos ({moraCounts.total})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltroMora('AL_DIA')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer border flex items-center gap-1.5 ${
+                filtroMora === 'AL_DIA' ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Al Día ({moraCounts.alDia})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltroMora('REGULAR')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer border flex items-center gap-1.5 ${
+                filtroMora === 'REGULAR' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>1 Cuota Regular ({moraCounts.regular})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltroMora('CRITICA')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer border flex items-center gap-1.5 ${
+                filtroMora === 'CRITICA' ? 'bg-red-700 text-white border-red-700' : 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+              <span>Mora Crítica ({moraCounts.critica})</span>
+            </button>
+          </div>
+        )}
+
         {/* Quick Actions, Filtro de Deuda & Search */}
         <div className="flex flex-wrap justify-between items-center gap-3 pt-2 border-t border-slate-100">
           <div className="flex flex-wrap items-center gap-3">
@@ -706,13 +892,40 @@ export default function ReportesPage({
             <button
               onClick={handlePrintJasper}
               className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
-              title="Imprimir reporte sin capturar la pantalla"
+              title="Imprimir reporte en formato horizontal con membrete oficial"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Imprimir Vista Jasper</span>
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Resumen Ejecutivo Superior por Cajas Oficiales */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 no-print">
+        {kpisCajas.map(kpi => (
+          <div 
+            key={kpi.id} 
+            className={`p-3 rounded-2xl border transition shadow-xs ${
+              kpi.isMain 
+                ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white border-slate-700 shadow-sm' 
+                : 'bg-white border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className={`text-[10px] font-black uppercase tracking-wider ${kpi.isMain ? 'text-red-400' : 'text-slate-500'}`}>
+                {kpi.nombre}
+              </span>
+              <span className={`w-2 h-2 rounded-full ${kpi.dot}`}></span>
+            </div>
+            <div className={`text-base sm:text-lg font-black font-mono tracking-tight ${kpi.isMain ? 'text-white' : 'text-slate-900'}`}>
+              Bs {kpi.monto.toLocaleString('es-BO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+            </div>
+            <span className={`text-[10px] block truncate font-medium ${kpi.isMain ? 'text-slate-300' : 'text-slate-400'}`}>
+              {kpi.sub}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* ========================================================================= */}
@@ -748,22 +961,22 @@ export default function ReportesPage({
             </p>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[620px] overflow-y-auto border border-slate-300 rounded-xl relative shadow-2xs">
             <table className="w-full text-[11px] text-left border-collapse border border-slate-400 font-mono">
-              <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-400">
-                <tr className="divide-x divide-slate-300 text-center">
-                  <th className="p-2 w-14 bg-slate-200 text-slate-900 font-sans">Interno</th>
+              <thead className="bg-slate-900 text-white font-bold border-b border-slate-700 sticky top-0 z-20 shadow-sm">
+                <tr className="divide-x divide-slate-700 text-center">
+                  <th className="p-2 w-14 bg-slate-950 text-white font-sans">Interno</th>
                   <th className="p-2 text-left min-w-[130px] font-sans">Nombre Afiliado</th>
-                  <th className="p-2">Frecuencia<br/><span className="text-[9px] text-red-700 font-bold">Caja 1 (200 Bs)</span></th>
-                  <th className="p-2">No Turno<br/><span className="text-[9px] text-slate-500">Caja 2 (20 Bs)</span></th>
-                  <th className="p-2">Art. 5<br/><span className="text-[9px] text-slate-500">Caja 2 (5 Bs)</span></th>
-                  <th className="p-2">Ubicación<br/><span className="text-[9px] text-slate-500">Caja 2 (20 Bs)</span></th>
-                  <th className="p-2">Dom / Fer<br/><span className="text-[9px] text-slate-500">Caja 2 (40 Bs)</span></th>
-                  <th className="p-2">Nuevos<br/><span className="text-[9px] text-slate-500">Caja 3 (500 Bs)</span></th>
-                  <th className="p-2">Préstamos<br/><span className="text-[9px] text-blue-700 font-bold">Caja 4</span></th>
-                  <th className="p-2">Inquilinos<br/><span className="text-[9px] text-slate-500">Caja 5 (250 Bs)</span></th>
-                  <th className="p-2">Otros<br/><span className="text-[9px] text-slate-500">Varios Bs</span></th>
-                  <th className="p-2 bg-slate-200 font-extrabold text-slate-900 font-sans">TOTAL</th>
+                  <th className="p-2">Frecuencia<br/><span className="text-[9px] text-red-400 font-bold">Caja 1 (200 Bs)</span></th>
+                  <th className="p-2">No Turno<br/><span className="text-[9px] text-slate-300">Caja 2 (20 Bs)</span></th>
+                  <th className="p-2">Art. 5<br/><span className="text-[9px] text-slate-300">Caja 2 (5 Bs)</span></th>
+                  <th className="p-2">Ubicación<br/><span className="text-[9px] text-slate-300">Caja 2 (20 Bs)</span></th>
+                  <th className="p-2">Dom / Fer<br/><span className="text-[9px] text-slate-300">Caja 2 (40 Bs)</span></th>
+                  <th className="p-2">Nuevos<br/><span className="text-[9px] text-slate-300">Caja 3 (500 Bs)</span></th>
+                  <th className="p-2">Préstamos<br/><span className="text-[9px] text-blue-400 font-bold">Caja 4</span></th>
+                  <th className="p-2">Inquilinos<br/><span className="text-[9px] text-slate-300">Caja 5 (250 Bs)</span></th>
+                  <th className="p-2">Otros<br/><span className="text-[9px] text-slate-300">Varios Bs</span></th>
+                  <th className="p-2 bg-slate-950 font-extrabold text-white font-sans">TOTAL</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -877,22 +1090,22 @@ export default function ReportesPage({
             </p>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[620px] overflow-y-auto border border-slate-300 rounded-xl relative shadow-2xs">
             <table className="w-full text-[11px] text-left border-collapse border border-slate-400 font-mono">
-              <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-400">
-                <tr className="divide-x divide-slate-300 text-center">
-                  <th className="p-2 w-14 bg-slate-200 text-slate-900 font-sans">Interno</th>
-                  <th className="p-2 text-left min-w-[130px] font-sans">Nombre Afiliado</th>
-                  <th className="p-2">Frecuencia<br/><span className="text-[9px] text-red-700 font-bold">Caja 1 (200 Bs)</span></th>
-                  <th className="p-2">No Turno<br/><span className="text-[9px] text-slate-500">Caja 2 (20 Bs)</span></th>
-                  <th className="p-2">Art. 5<br/><span className="text-[9px] text-slate-500">Caja 2 (5 Bs)</span></th>
-                  <th className="p-2">Ubicación<br/><span className="text-[9px] text-slate-500">Caja 2 (20 Bs)</span></th>
-                  <th className="p-2">Dom / Fer<br/><span className="text-[9px] text-slate-500">Caja 2 (40 Bs)</span></th>
-                  <th className="p-2">Nuevos<br/><span className="text-[9px] text-slate-500">Caja 3 (500 Bs)</span></th>
-                  <th className="p-2">Préstamos<br/><span className="text-[9px] text-blue-700 font-bold">Caja 4</span></th>
-                  <th className="p-2">Inquilinos<br/><span className="text-[9px] text-slate-500">Caja 5 (250 Bs)</span></th>
-                  <th className="p-2">Otros<br/><span className="text-[9px] text-slate-500">Varios Bs</span></th>
-                  <th className="p-2 bg-red-100 font-extrabold text-red-900 font-sans">TOTAL DEUDA</th>
+              <thead className="bg-slate-900 text-white font-bold border-b border-slate-700 sticky top-0 z-20 shadow-sm">
+                <tr className="divide-x divide-slate-700 text-center">
+                  <th className="p-2 w-14 bg-slate-950 text-white font-sans">Interno</th>
+                  <th className="p-2 text-left min-w-[170px] font-sans">Nombre Afiliado y Estado</th>
+                  <th className="p-2">Frecuencia<br/><span className="text-[9px] text-red-400 font-bold">Caja 1 (200 Bs)</span></th>
+                  <th className="p-2">No Turno<br/><span className="text-[9px] text-slate-300">Caja 2 (20 Bs)</span></th>
+                  <th className="p-2">Art. 5<br/><span className="text-[9px] text-slate-300">Caja 2 (5 Bs)</span></th>
+                  <th className="p-2">Ubicación<br/><span className="text-[9px] text-slate-300">Caja 2 (20 Bs)</span></th>
+                  <th className="p-2">Dom / Fer<br/><span className="text-[9px] text-slate-300">Caja 2 (40 Bs)</span></th>
+                  <th className="p-2">Nuevos<br/><span className="text-[9px] text-slate-300">Caja 3 (500 Bs)</span></th>
+                  <th className="p-2">Préstamos<br/><span className="text-[9px] text-blue-400 font-bold">Caja 4</span></th>
+                  <th className="p-2">Inquilinos<br/><span className="text-[9px] text-slate-300">Caja 5 (250 Bs)</span></th>
+                  <th className="p-2">Otros<br/><span className="text-[9px] text-slate-300">Varios Bs</span></th>
+                  <th className="p-2 bg-red-950 text-white font-extrabold font-sans">TOTAL DEUDA</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -919,12 +1132,27 @@ export default function ReportesPage({
                       row.frecuenciaInquilinos + row.otros);
 
                     return (
-                      <tr key={row.interno} className="divide-x divide-slate-200 hover:bg-red-50/50 transition">
-                        <td className="p-1.5 text-center font-bold text-slate-900 bg-slate-50/80 font-sans">
+                      <tr key={row.interno} className={`divide-x divide-slate-200 transition ${rowTotal > 200 ? 'bg-red-50/40 hover:bg-red-50' : 'hover:bg-slate-50'}`}>
+                        <td className="p-1.5 text-center font-bold text-slate-900 bg-slate-50 font-sans">
                           #{row.interno}
                         </td>
-                        <td className="p-1.5 text-left font-sans font-semibold text-slate-800 truncate max-w-[150px]">
-                          {row.nombre}
+                        <td className="p-1.5 text-left font-sans font-semibold text-slate-800">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="truncate max-w-[130px]">{row.nombre}</span>
+                            {rowTotal === 0 ? (
+                              <span className="inline-flex items-center text-[9px] font-black bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full border border-emerald-300 shrink-0">
+                                Al Día
+                              </span>
+                            ) : rowTotal <= 200 ? (
+                              <span className="inline-flex items-center text-[9px] font-black bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full border border-amber-300 shrink-0">
+                                1 Cuota
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center text-[9px] font-black bg-red-100 text-red-800 px-1.5 py-0.5 rounded-full border border-red-300 shrink-0">
+                                Mora ({Math.ceil(rowTotal / 200)}m)
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-1.5 text-right font-bold text-red-800">{row.cuotaFrecuencia.toFixed(1)}</td>
                         <td className="p-1.5 text-right">{row.multaNoTurno.toFixed(1)}</td>
@@ -935,7 +1163,13 @@ export default function ReportesPage({
                         <td className="p-1.5 text-right text-blue-700 font-bold">{row.prestamos.toFixed(1)}</td>
                         <td className="p-1.5 text-right">{row.frecuenciaInquilinos.toFixed(1)}</td>
                         <td className="p-1.5 text-right">{row.otros.toFixed(1)}</td>
-                        <td className="p-1.5 text-right font-black bg-red-50 text-red-900 font-sans">
+                        <td className={`p-1.5 text-right font-mono font-black ${
+                          rowTotal > 200 
+                            ? 'bg-red-100 text-red-900 text-xs' 
+                            : rowTotal > 0 
+                              ? 'bg-amber-50 text-amber-900 font-bold' 
+                              : 'bg-emerald-50 text-emerald-800 font-bold'
+                        }`}>
                           {rowTotal.toFixed(1)}
                         </td>
                       </tr>
