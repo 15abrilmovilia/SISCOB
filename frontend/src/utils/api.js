@@ -256,13 +256,13 @@ export async function deleteUsuarioAPI(id) {
   }
 }
 
-// 8. Puesta a Cero de Producción en Supabase (Railway)
-export async function resetSistemaAPI({ saldoCajaGeneral = 0, saldoCajaGPS = 0 } = {}) {
+// 8. Puesta a Cero de Producción en Supabase (Railway) - Cierre Contable
+export async function resetSistemaAPI(payloadSaldos = {}) {
   try {
     const res = await fetch(`${API_BASE}/api/sistema/reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ saldoCajaGeneral, saldoCajaGPS })
+      body: JSON.stringify(payloadSaldos)
     });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));

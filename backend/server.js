@@ -1016,18 +1016,38 @@ app.delete('/api/usuarios/:id', (req, res) => {
   res.json({ success: true });
 });
 
-// 8. Puesta a Cero de Producción
+// 8. Cierre Contable y Puesta a Cero del Dinero (Protegiendo el Padrón de Socios)
 app.post('/api/sistema/reset', async (req, res) => {
   const payloadSaldos = req.body || {};
   if (pool) {
     try {
-      await pool.query('DELETE FROM deudas_socio');
+      // 1. Limpiar únicamente registros financieros (recibos y egresos)
       await pool.query('DELETE FROM recibos');
       await pool.query('DELETE FROM egresos');
-      await pool.query('DELETE FROM socios');
       await pool.query('DELETE FROM auditoria_logs').catch(() => {});
+
+      // 2. Limpiar deudas anteriores y regenerar cuotas de frecuencia mensual (Bs 200) para todos los socios
+      await pool.query('DELETE FROM deudas_socio');
+
+      const { rows: sociosRows } = await pool.query('SELECT id, nro_movil FROM socios ORDER BY id ASC');
+      const sociosParaCuotas = sociosRows.length > 0 ? sociosRows : NOMINA_206_SOCIOS;
       
-      // Reiniciar las 5 cajas oficiales con sus saldos de apertura
+      for (const s of sociosParaCuotas) {
+        const movilStr = s.nro_movil || s.nroMovil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : `${s.id}`);
+        await pool.query(`
+          INSERT INTO deudas_socio (socio_id, concepto_id, descripcion, periodo, monto, pagado, fecha_vencimiento)
+          VALUES ($1, $2, $3, $4, $5, false, $6)
+        `, [
+          s.id, 
+          1, 
+          `Cuota Frecuencia Mensual (Móvil ${movilStr})`, 
+          'Septiembre 2026', 
+          200.00, 
+          '2026-09-30'
+        ]);
+      }
+
+      // 3. Reiniciar las 5 cajas oficiales con sus saldos de apertura (ingresos = 0, egresos = 0)
       for (const c of OFFICIAL_5_CAJAS) {
         const saldo = typeof payloadSaldos[c.id] === 'number' 
           ? payloadSaldos[c.id] 
@@ -1040,9 +1060,8 @@ app.post('/api/sistema/reset', async (req, res) => {
         `, [c.id, c.nombre, saldo]).catch(() => {});
       }
 
-      // Reiniciar secuencias autonuméricas para que los nuevos socios inicien en 1
+      // 4. Reiniciar secuencias de recibos y egresos (el padrón de socios NO se toca)
       try {
-        await pool.query('ALTER SEQUENCE IF EXISTS socios_id_seq RESTART WITH 1');
         await pool.query('ALTER SEQUENCE IF EXISTS deudas_socio_id_seq RESTART WITH 1');
         await pool.query('ALTER SEQUENCE IF EXISTS recibos_id_seq RESTART WITH 1');
         await pool.query('ALTER SEQUENCE IF EXISTS egresos_id_seq RESTART WITH 1');
@@ -1050,13 +1069,48 @@ app.post('/api/sistema/reset', async (req, res) => {
         console.warn('Reinicio de secuencias advertencia:', seqErr.message);
       }
 
-      return res.json({ success: true, message: 'Base de datos en Supabase reiniciada a cero con las 5 cajas oficiales.' });
+      // 5. Consultar deudas y cajas actualizadas para devolverlas
+      const { rows: updatedDeudas } = await pool.query('SELECT * FROM deudas_socio ORDER BY id ASC');
+      const { rows: updatedCajas } = await pool.query('SELECT * FROM cajas ORDER BY id ASC');
+
+      const formattedDeudas = updatedDeudas.map(d => ({
+        id: `d${d.id}`,
+        dbId: d.id,
+        socioId: d.socio_id,
+        descripcion: d.descripcion,
+        monto: parseFloat(d.monto) || 0,
+        pagado: d.pagado,
+        periodo: d.periodo,
+        fecha: d.created_at ? d.created_at.toISOString().slice(0, 10) : '',
+        moneda: 'Bs',
+        cantidad: 1
+      }));
+
+      const formattedCajas = updatedCajas.map(c => ({
+        id: c.id,
+        nombre: c.nombre,
+        saldoAnterior: parseFloat(c.saldo_anterior) || 0,
+        ingresos: 0,
+        egresos: 0,
+        saldoActual: parseFloat(c.saldo_actual) || 0
+      }));
+
+      return res.json({ 
+        success: true, 
+        message: `Puesta a cero del dinero completada. Se conservaron intactos ${sociosParaCuotas.length} socios y se generaron sus cuotas de frecuencia mensual.`,
+        deudas: formattedDeudas,
+        cajas: formattedCajas
+      });
     } catch (err) {
-      console.error('Error al reiniciar DB en Supabase:', err);
-      return res.status(500).json({ error: 'Error al reiniciar DB en Supabase', detail: err.message });
+      console.error('Error al reiniciar dinero en Supabase:', err);
+      return res.status(500).json({ error: 'Error al reiniciar dinero en Supabase', detail: err.message });
     }
   }
-  res.json({ success: true, message: 'Memoria reiniciada a cero con las 5 cajas oficiales.' });
+
+  res.json({ 
+    success: true, 
+    message: 'Puesta a cero del dinero completada en memoria local (socios conservados).' 
+  });
 });
 
 // Start Server (using native node execution, no nodemon)

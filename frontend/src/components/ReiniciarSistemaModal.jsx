@@ -4,7 +4,9 @@ import {
   AlertTriangle, 
   Download, 
   Trash2, 
+  RotateCcw,
   ShieldAlert, 
+  ShieldCheck,
   CheckCircle2, 
   RefreshCw 
 } from 'lucide-react';
@@ -72,15 +74,15 @@ export default function ReiniciarSistemaModal({
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-rose-200 animate-in fade-in zoom-in-95 duration-150 my-auto">
         
-        {/* Header con advertencia roja */}
+        {/* Header */}
         <div className="bg-gradient-to-r from-rose-800 via-red-700 to-red-800 px-6 py-4 text-white flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 bg-white/10 rounded-2xl">
               <ShieldAlert className="w-6 h-6 text-rose-200" />
             </div>
             <div>
-              <h3 className="text-base font-black tracking-wide">PUESTA A CERO DEL SISTEMA</h3>
-              <p className="text-xs text-rose-200">Apertura e inicio limpio de operaciones contables</p>
+              <h3 className="text-base font-black tracking-wide">CIERRE CONTABLE Y PUESTA A CERO DEL DINERO</h3>
+              <p className="text-xs text-rose-200">Reinicio de cajas y cuotas (Padrón de 206 socios 100% protegido)</p>
             </div>
           </div>
           <button
@@ -94,12 +96,12 @@ export default function ReiniciarSistemaModal({
         {/* Contenido */}
         <form onSubmit={handleProceed} className="p-6 space-y-5 text-xs">
           
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start space-x-3 text-amber-900 leading-relaxed">
-            <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start space-x-3 text-emerald-950 leading-relaxed">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
-              <strong className="block font-black text-amber-950">¡Acción Definitiva de Reinicio!</strong>
+              <strong className="block font-black text-emerald-900 mb-0.5">🛡️ Padrón de Socios 100% Protegido</strong>
               <span>
-                Esta operación vaciará el padrón de socios, eliminará la cartera de préstamos, todas las deudas, multas, egresos y recibos anteriores, dejando el sistema en blanco para comenzar el registro real de este mes (Septiembre 2026).
+                El padrón de los <strong>206 socios</strong> y los conceptos oficiales <strong>permanecerán intactos y seguros</strong>. Esta acción únicamente reiniciará el dinero: colocará los saldos de ingresos y egresos de las cajas en 0.00 (con el saldo de apertura que asignes), limpiará recibos y egresos anteriores, y generará las cuotas de frecuencia mensual (Bs 200) listas para cobrar este mes.
               </span>
             </div>
           </div>
@@ -255,12 +257,12 @@ export default function ReiniciarSistemaModal({
               {isResetting ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                  <span>BORRANDO EN SUPABASE Y SISTEMA...</span>
+                  <span>REINICIANDO CAJAS Y CUOTAS EN NUBE...</span>
                 </>
               ) : (
                 <>
-                  <Trash2 className="w-4 h-4" />
-                  <span>BORRAR Y EMPEZAR DE CERO</span>
+                  <RotateCcw className="w-4 h-4" />
+                  <span>REINICIAR DINERO Y CUOTAS (CONSERVAR SOCIOS)</span>
                 </>
               )}
             </button>

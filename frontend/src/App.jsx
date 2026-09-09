@@ -283,9 +283,7 @@ export default function App() {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   const handleConfirmResetSystem = async (payloadSaldos = {}) => {
-    // 1. Limpieza de datos en memoria local
-    setSocios([]);
-    setDeudas([]);
+    // 1. Limpieza de datos financieros (CONSERVANDO los socios intactos)
     setEgresos([]);
     setPrestamos([]);
     setRecibos([]);
@@ -304,23 +302,44 @@ export default function App() {
     });
     setCajas(nuevasCajas);
 
-    // 2. Guardar en almacenamiento local
-    saveToStorage(STORAGE_KEYS.SOCIOS, []);
-    saveToStorage(STORAGE_KEYS.DEUDAS, []);
+    // 2. Guardar en almacenamiento local (socios NO se tocan)
     saveToStorage(STORAGE_KEYS.EGRESOS, []);
     saveToStorage(STORAGE_KEYS.PRESTAMOS, []);
     saveToStorage(STORAGE_KEYS.RECIBOS, []);
     saveToStorage(STORAGE_KEYS.CAJAS, nuevasCajas);
 
-    // 3. Ejecutar reinicio real en backend/Supabase
+    // 3. Ejecutar reinicio contable en backend/Supabase
     try {
-      await resetSistemaAPI(payloadSaldos);
+      const resp = await resetSistemaAPI(payloadSaldos);
+      if (resp && resp.deudas && Array.isArray(resp.deudas)) {
+        setDeudas(resp.deudas);
+        saveToStorage(STORAGE_KEYS.DEUDAS, resp.deudas);
+      }
+      if (resp && resp.cajas && Array.isArray(resp.cajas)) {
+        setCajas(resp.cajas);
+        saveToStorage(STORAGE_KEYS.CAJAS, resp.cajas);
+      }
     } catch (apiErr) {
-      console.warn('[SISCOB] Aviso al resetear en nube:', apiErr.message);
+      console.warn('[SISCOB] Aviso al reiniciar dinero en nube:', apiErr.message);
+      // Fallback local: regenerar cuotas de frecuencia para los socios existentes
+      const fallbackDeudas = (socios && socios.length > 0 ? socios : []).map((s, idx) => ({
+        id: `d${idx + 1}`,
+        dbId: idx + 1,
+        socioId: s.id,
+        descripcion: `Cuota Frecuencia Mensual (Móvil ${s.nroMovil || s.id})`,
+        monto: 200.0,
+        pagado: false,
+        periodo: 'Septiembre 2026',
+        fecha: new Date().toISOString().slice(0, 10),
+        moneda: 'Bs',
+        cantidad: 1
+      }));
+      setDeudas(fallbackDeudas);
+      saveToStorage(STORAGE_KEYS.DEUDAS, fallbackDeudas);
     }
 
-    setActiveTab('socios');
-    alert('¡Puesta a Cero completada con éxito! Las 5 cajas oficiales están configuradas y listas para las operaciones de este mes.');
+    setActiveTab('cobranzas');
+    alert('¡Puesta a Cero contable completada con éxito! El padrón de socios permanece 100% intacto, las cajas se reiniciaron y se generaron las cuotas del nuevo mes.');
   };
 
   const handleGoToCobranza = (socioId) => {
