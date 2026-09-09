@@ -49,6 +49,7 @@ import {
   getDeudasAPI, 
   getEgresosAPI,
   getUsuariosAPI,
+  getRecibosAPI,
   resetSistemaAPI,
   deleteDeudasPrestamosAPI,
   createDeudaAPI
@@ -135,15 +136,29 @@ export default function App() {
   useEffect(() => {
     async function syncCloud() {
       try {
-        const [cloudSocios, cloudCajas, cloudDeudas, cloudEgresos, cloudUsuarios] = await Promise.all([
+        const [cloudSocios, cloudCajas, cloudDeudas, cloudEgresos, cloudUsuarios, cloudRecibos] = await Promise.all([
           getSociosAPI(),
           getCajasAPI(),
           getDeudasAPI(),
           getEgresosAPI(),
-          getUsuariosAPI()
+          getUsuariosAPI(),
+          getRecibosAPI()
         ]);
         if (Array.isArray(cloudSocios) && cloudSocios.length > 0) setSocios(sanitizeSocioObligaciones(cloudSocios));
-        if (Array.isArray(cloudCajas) && cloudCajas.length > 0) setCajas(cloudCajas);
+        if (Array.isArray(cloudCajas) && cloudCajas.length > 0) {
+          setCajas(prevCajas => {
+            const cloudTotal = cloudCajas.reduce((sum, c) => sum + (parseFloat(c.ingresos) || 0), 0);
+            const prevTotal = Array.isArray(prevCajas) ? prevCajas.reduce((sum, c) => sum + (parseFloat(c.ingresos) || 0), 0) : 0;
+            // Si la nube responde con 0 pero localmente hay ingresos registrados, proteger el saldo local
+            if (cloudTotal === 0 && prevTotal > 0) {
+              return prevCajas;
+            }
+            return cloudCajas;
+          });
+        }
+        if (Array.isArray(cloudRecibos) && cloudRecibos.length > 0) {
+          setRecibos(cloudRecibos);
+        }
         if (Array.isArray(cloudDeudas) && cloudDeudas.length > 0) {
           // Si la cartera de préstamos está vacía, no importar cuotas huérfanas de préstamos de prueba
           if (prestamos.length === 0) {

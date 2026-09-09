@@ -14,6 +14,15 @@ const NOMINA_206_SOCIOS = require('./socios_nomina_206.json');
 const CONCEPTOS_OFICIALES = require('./conceptos_oficiales.json');
 const DEUDAS_SEPTIEMBRE_206 = require('./deudas_septiembre_206.json');
 
+// 5 Cajas Oficiales de SISCOB
+const OFFICIAL_5_CAJAS = [
+  { id: "c1", nombre: "CAJA DE FRECUENCIA", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
+  { id: "c2", nombre: "CAJA DE MULTAS E INFRACCIONES", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
+  { id: "c3", nombre: "CAJA NUEVOS SOCIOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
+  { id: "c4", nombre: "CAJA PRÉSTAMOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
+  { id: "c5", nombre: "CAJA FRECUENCIA INQUILINOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 }
+];
+
 async function seedSociosIfEmpty() {
   if (!pool) return;
   try {
@@ -101,6 +110,38 @@ async function seedConceptosYDeudas() {
   }
 }
 
+async function syncCajasTotals() {
+  if (!pool) return;
+  try {
+    for (const c of OFFICIAL_5_CAJAS) {
+      await pool.query(`
+        INSERT INTO cajas (id, nombre, saldo_anterior, ingresos, egresos, saldo_actual)
+        VALUES ($1, $2, $3, 0, 0, $3)
+        ON CONFLICT (id) DO UPDATE 
+        SET nombre = EXCLUDED.nombre
+      `, [c.id, c.nombre, c.saldoAnterior]).catch(() => {});
+    }
+
+    await pool.query(`
+      UPDATE cajas c
+      SET ingresos = COALESCE(sub.total_ingresos, 0),
+          egresos = COALESCE(sub.total_egresos, 0),
+          saldo_actual = COALESCE(c.saldo_anterior, 0) + COALESCE(sub.total_ingresos, 0) - COALESCE(sub.total_egresos, 0)
+      FROM (
+        SELECT 
+          cajas.id,
+          (SELECT COALESCE(SUM(total), 0) FROM recibos WHERE caja_id = cajas.id) as total_ingresos,
+          (SELECT COALESCE(SUM(monto), 0) FROM egresos WHERE caja_id = cajas.id) as total_egresos
+        FROM cajas
+      ) sub
+      WHERE c.id = sub.id;
+    `);
+    console.log('[SISCOB Backend] Saldos e ingresos de las 5 cajas reconciliados con éxito.');
+  } catch (err) {
+    console.error('[SISCOB Backend] Error al sincronizar saldos de cajas:', err.message);
+  }
+}
+
 if (process.env.DATABASE_URL) {
   const { Pool } = require('pg');
   pool = new Pool({
@@ -111,6 +152,7 @@ if (process.env.DATABASE_URL) {
   (async () => {
     await seedSociosIfEmpty();
     await seedConceptosYDeudas();
+    await syncCajasTotals();
   })();
 } else {
   console.log('[SISCOB Backend] Modo desarrollo local activo (sin base de datos remota conectada aún).');
@@ -516,15 +558,6 @@ app.delete('/api/socios/:id', async (req, res) => {
   res.json({ success: true });
 });
 
-// 5 Cajas Oficiales de SISCOB
-const OFFICIAL_5_CAJAS = [
-  { id: "c1", nombre: "CAJA DE FRECUENCIA", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
-  { id: "c2", nombre: "CAJA DE MULTAS E INFRACCIONES", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
-  { id: "c3", nombre: "CAJA NUEVOS SOCIOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
-  { id: "c4", nombre: "CAJA PRÉSTAMOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 },
-  { id: "c5", nombre: "CAJA FRECUENCIA INQUILINOS", saldoAnterior: 0.00, ingresos: 0.00, egresos: 0.00, saldoActual: 0.00 }
-];
-
 // 3. Cajas Endpoints
 app.get('/api/cajas', async (req, res) => {
   if (pool) {
@@ -535,11 +568,34 @@ app.get('/api/cajas', async (req, res) => {
           INSERT INTO cajas (id, nombre, saldo_anterior, ingresos, egresos, saldo_actual)
           VALUES ($1, $2, $3, 0, 0, $3)
           ON CONFLICT (id) DO UPDATE 
-          SET nombre = $2
+          SET nombre = EXCLUDED.nombre
         `, [c.id, c.nombre, c.saldoAnterior]).catch(() => {});
       }
 
-      const { rows } = await pool.query('SELECT * FROM cajas ORDER BY id ASC');
+      // Reconciliar y consultar sumas reales de recibos y egresos
+      const query = `
+        SELECT 
+          c.id,
+          c.nombre,
+          c.moneda,
+          COALESCE(c.saldo_anterior, 0.00) as saldo_anterior,
+          GREATEST(COALESCE(c.ingresos, 0.00), COALESCE(r.total_ingresos, 0.00)) as ingresos,
+          GREATEST(COALESCE(c.egresos, 0.00), COALESCE(e.total_egresos, 0.00)) as egresos,
+          (COALESCE(c.saldo_anterior, 0.00) + GREATEST(COALESCE(c.ingresos, 0.00), COALESCE(r.total_ingresos, 0.00)) - GREATEST(COALESCE(c.egresos, 0.00), COALESCE(e.total_egresos, 0.00))) as saldo_actual
+        FROM cajas c
+        LEFT JOIN (
+          SELECT caja_id, SUM(total) as total_ingresos 
+          FROM recibos 
+          GROUP BY caja_id
+        ) r ON c.id = r.caja_id
+        LEFT JOIN (
+          SELECT caja_id, SUM(monto) as total_egresos 
+          FROM egresos 
+          GROUP BY caja_id
+        ) e ON c.id = e.caja_id
+        ORDER BY c.id ASC
+      `;
+      const { rows } = await pool.query(query);
       const formatted = rows.map(c => ({
         id: c.id,
         nombre: c.nombre,
@@ -693,6 +749,15 @@ app.post('/api/egresos', async (req, res) => {
         responsable || 'Admin'
       ]);
       const e = rows[0];
+
+      // Actualizar saldos y egresos en la tabla cajas
+      await pool.query(`
+        UPDATE cajas 
+        SET egresos = COALESCE(egresos, 0) + $1,
+            saldo_actual = COALESCE(saldo_actual, 0) - $1 
+        WHERE id = $2
+      `, [monto, cajaId || 'c1']).catch(() => {});
+
       return res.status(201).json({
         id: e.id,
         nroBoleta: e.nro_boleta,
@@ -822,7 +887,26 @@ app.post('/api/cobranzas', async (req, res) => {
         }
       }
 
-      return res.status(201).json({ success: true, recibo: rows[0] });
+      // Actualizar saldos e ingresos en la tabla cajas
+      await pool.query(`
+        UPDATE cajas 
+        SET ingresos = COALESCE(ingresos, 0) + $1,
+            saldo_actual = COALESCE(saldo_actual, 0) + $1 
+        WHERE id = $2
+      `, [total, cajaId || 'c1']).catch(() => {});
+
+      // Consultar cajas actualizadas para devolverlas al cliente
+      const { rows: cajasRows } = await pool.query('SELECT * FROM cajas ORDER BY id ASC').catch(() => ({ rows: [] }));
+      const updatedCajas = cajasRows.map(c => ({
+        id: c.id,
+        nombre: c.nombre,
+        saldoAnterior: parseFloat(c.saldo_anterior) || 0,
+        ingresos: parseFloat(c.ingresos) || 0,
+        egresos: parseFloat(c.egresos) || 0,
+        saldoActual: parseFloat(c.saldo_actual) || 0
+      }));
+
+      return res.status(201).json({ success: true, recibo: rows[0], cajas: updatedCajas });
     } catch (err) {
       // Capturar error de UNIQUE constraint de PostgreSQL
       if (err.code === '23505' && err.constraint && err.constraint.includes('recibo')) {

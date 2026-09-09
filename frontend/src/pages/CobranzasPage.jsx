@@ -235,7 +235,7 @@ export default function CobranzasPage({
 
     // 4. Registrar en backend
     try {
-      await registrarCobranzaAPI({
+      const resp = await registrarCobranzaAPI({
         nroRecibo: `REC-${nroRecibo}`,
         nroComprobante: nroTransaccion || '',
         socioId: activeSocio.id,
@@ -245,6 +245,9 @@ export default function CobranzasPage({
         cajero: 'Cajero Central',
         deudaIds: selectedDeudaIds
       });
+      if (resp && resp.cajas && Array.isArray(resp.cajas) && resp.cajas.length > 0) {
+        setCajas(resp.cajas);
+      }
     } catch (e) {
       if (e.code === 'COMPROBANTE_DUPLICADO') {
         // *** REVERTIR CAMBIOS OPTIMISTAS ***

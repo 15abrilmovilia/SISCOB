@@ -179,6 +179,17 @@ export async function anularCobranzaAPI(reversalData) {
   }
 }
 
+export async function getRecibosAPI() {
+  try {
+    const res = await fetch(`${API_BASE}/api/recibos`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al obtener recibos remotos:', err.message);
+    return null;
+  }
+}
+
 export async function deleteEgresoAPI(id) {
   try {
     const res = await fetch(`${API_BASE}/api/egresos/${id}`, {

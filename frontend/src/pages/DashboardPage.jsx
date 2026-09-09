@@ -44,9 +44,19 @@ export default function DashboardPage({
     return acc + saldo;
   }, 0);
 
+  // Respaldo inmediato de cobranzas registradas
+  const totalCobradoDeudas = useMemo(() => {
+    return deudas.filter(d => d.pagado).reduce((acc, d) => acc + (parseFloat(d.monto) || 0), 0);
+  }, [deudas]);
+
+  const recaudacionTotalMes = Math.max(totalRecaudadoCajas, totalCobradoDeudas);
+  const liquidezTotalMes = totalLiquidezCajas > 0 
+    ? totalLiquidezCajas 
+    : Math.max(0, recaudacionTotalMes - totalEgresadoCajas);
+
   // Meta del mes (calculada sobre ingresos reales)
   const metaMensual = 150000.0;
-  const progresoMeta = metaMensual > 0 ? Math.min(Math.round((totalRecaudadoCajas / metaMensual) * 100), 100) : 0;
+  const progresoMeta = metaMensual > 0 ? Math.min(Math.round((recaudacionTotalMes / metaMensual) * 100), 100) : 0;
 
   // 2. Socios en Mora reales
   const deudasPendientes = deudas.filter(d => !d.pagado);
@@ -213,7 +223,7 @@ export default function DashboardPage({
   const sociosActivosCount = socios.filter(s => s.estado === 'ACTIVO' || s.estado === 'VIG').length;
 
   // 3. Gráfico de Barras según timeframe (Refleja actividad real)
-  const hasTransacciones = totalRecaudadoCajas > 0 || totalEgresadoCajas > 0;
+  const hasTransacciones = recaudacionTotalMes > 0 || totalEgresadoCajas > 0;
   const weeklyData = [
     { day: 'L', label: 'Lun', val: hasTransacciones ? 35 : 0, total: hasTransacciones ? 'Bs 14,200' : 'Bs 0' },
     { day: 'M', label: 'Mar', val: hasTransacciones ? 62 : 0, total: hasTransacciones ? 'Bs 28,500' : 'Bs 0' },
@@ -343,7 +353,7 @@ export default function DashboardPage({
                 Recaudación Total (Mes Actual)
               </span>
               <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight">
-                Bs {totalRecaudadoCajas.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                Bs {recaudacionTotalMes.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
             <div className="bg-red-600/60 p-2.5 rounded-xl border border-red-400/30">
@@ -377,7 +387,7 @@ export default function DashboardPage({
           </div>
           <div className="mt-2">
             <div className="text-2xl font-black text-slate-900 font-mono">
-              Bs {totalLiquidezCajas.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Bs {liquidezTotalMes.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <span className="text-xs font-semibold text-slate-500 block">Patrimonio en Cajas</span>
             <div className="flex items-center space-x-1 text-[11px] text-emerald-700 font-bold mt-1">
