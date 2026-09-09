@@ -39,6 +39,7 @@ export default function KardexModal({ isOpen, onClose, socio, deudas }) {
         <div id="printable-area" className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
           {/* Header */}
           <div className="text-center border-b pb-3 space-y-1">
+            <img src="/logo-15-de-abril.jpg" alt="Logo 15 de Abril" className="w-14 h-14 object-contain mx-auto mb-1" />
             <h2 className="font-black text-lg text-slate-900 tracking-wider uppercase">
               RADIO MÓVIL 15 DE ABRIL
             </h2>

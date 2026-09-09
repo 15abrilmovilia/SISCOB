@@ -40,6 +40,7 @@ export default function ArqueoCajaModal({ isOpen, onClose, cajas, currentUser })
         {/* Printable Ticket / Voucher 80mm */}
         <div id="printable-area" className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
           <div className="text-center border-b pb-2 space-y-0.5">
+            <img src="/logo-15-de-abril.jpg" alt="Logo 15 de Abril" className="w-12 h-12 object-contain mx-auto mb-1" />
             <h2 className="font-black text-sm uppercase tracking-wider text-slate-900">
               RADIO MÓVIL 15 DE ABRIL
             </h2>

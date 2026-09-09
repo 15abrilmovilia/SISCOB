@@ -16,6 +16,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { printIsolatedDocument, downloadCSV, downloadXLSX } from '../utils/printHelper';
+import { LOGO_15_ABRIL_BASE64 } from '../assets/logoBase64';
 
 export default function BalancePage({ cajas = [], egresos = [], socios = [], currentUser }) {
   // Period filter states (default: first day of current month to today)
@@ -112,19 +113,23 @@ export default function BalancePage({ cajas = [], egresos = [], socios = [], cur
     const html = `
       <div style="max-width: 800px; margin: 0 auto; font-family: 'Inter', sans-serif; color: #0f172a; padding: 10px;">
         <!-- Encabezado Oficial -->
-        <div style="text-align: center; border-bottom: 2.5px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 14px;">
-          <h1 style="font-size: 18px; font-weight: 900; letter-spacing: 1px; color: #0f172a; margin-bottom: 2px;">
-            ASOCIACIÓN DE TRANSPORTE "RADIO MÓVIL 15 DE ABRIL" S.R.L.
-          </h1>
-          <p style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
-            Personería Jurídica N° 458/98 • NIT: 1028374029 • Tarija, Bolivia
-          </p>
-          <div style="display: inline-block; background: #1e3a8a; color: #ffffff; font-weight: 800; font-size: 12px; padding: 4px 18px; border-radius: 4px; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
-            INFORME ECONÓMICO Y BALANCE GENERAL POR CAJAS
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2.5px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 14px;">
+          <img src="${LOGO_15_ABRIL_BASE64}" alt="Radio Móvil 15 de Abril" style="width: 70px; height: 70px; object-fit: contain;" />
+          <div style="text-align: center; flex: 1; padding: 0 10px;">
+            <h1 style="font-size: 17px; font-weight: 900; letter-spacing: 0.5px; color: #0f172a; margin-bottom: 2px;">
+              ASOCIACIÓN DE TRANSPORTE "RADIO MÓVIL 15 DE ABRIL" S.R.L.
+            </h1>
+            <p style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin: 2px 0;">
+              Personería Jurídica N° 458/98 • NIT: 1028374029 • Tarija, Bolivia
+            </p>
+            <div style="display: inline-block; background: #1e3a8a; color: #ffffff; font-weight: 800; font-size: 11px; padding: 3px 16px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;">
+              INFORME ECONÓMICO Y BALANCE GENERAL POR CAJAS
+            </div>
+            <p style="font-size: 10px; font-family: 'JetBrains Mono', monospace; color: #334155; margin-top: 4px;">
+              Periodo Evaluado: <strong>${fechaDesde}</strong> al <strong>${fechaHasta}</strong> | Moneda: <strong>Bolivianos (Bs)</strong>
+            </p>
           </div>
-          <p style="font-size: 10.5px; font-family: 'JetBrains Mono', monospace; color: #334155; margin-top: 6px;">
-            Periodo Evaluado: <strong>${fechaDesde}</strong> al <strong>${fechaHasta}</strong> | Moneda: <strong>Bolivianos (Bs)</strong>
-          </p>
+          <div style="width: 70px;"></div>
         </div>
 
         <!-- 4 Tarjetas de Resumen Ejecutivo -->

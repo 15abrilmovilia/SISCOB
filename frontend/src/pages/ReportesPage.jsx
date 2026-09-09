@@ -12,6 +12,7 @@ import {
   Database
 } from 'lucide-react';
 import { printIsolatedDocument, downloadCSV, downloadXLSX } from '../utils/printHelper';
+import { LOGO_15_ABRIL_BASE64 } from '../assets/logoBase64';
 
 // Datos de Ingresos Recaudados Históricos (Fiel a JasperViewer)
 const RAW_INGRESOS = [
@@ -457,10 +458,14 @@ export default function ReportesPage({
 
     const html = `
       <div style="width: 100%; margin: 0 auto; font-family: 'Inter', sans-serif;">
-        <div style="text-align: center; border-bottom: 2px solid #b91c1c; padding-bottom: 8px; margin-bottom: 10px;">
-          <h2 style="font-size: 15px; font-weight: 900; text-transform: uppercase; color: #0f172a;">RADIO MÓVIL 15 DE ABRIL S.R.L.</h2>
-          <h3 style="font-size: 13px; font-weight: 800; color: #b91c1c; text-transform: uppercase;">${title}</h3>
-          <p style="font-size: 9px; color: #64748b; font-family: monospace; margin-top: 2px;">${subtitle}</p>
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #b91c1c; padding-bottom: 8px; margin-bottom: 10px;">
+          <img src="${LOGO_15_ABRIL_BASE64}" alt="Radio Móvil 15 de Abril" style="width: 65px; height: 65px; object-fit: contain;" />
+          <div style="text-align: center; flex: 1; padding: 0 10px;">
+            <h2 style="font-size: 15px; font-weight: 900; text-transform: uppercase; color: #0f172a; margin: 0;">RADIO MÓVIL 15 DE ABRIL S.R.L.</h2>
+            <h3 style="font-size: 13px; font-weight: 800; color: #b91c1c; text-transform: uppercase; margin: 2px 0;">${title}</h3>
+            <p style="font-size: 9px; color: #64748b; font-family: monospace; margin: 0;">${subtitle}</p>
+          </div>
+          <div style="width: 65px;"></div>
         </div>
 
         <table style="width: 100%; border-collapse: collapse; border: 1px solid #94a3b8;">
@@ -731,6 +736,7 @@ export default function ReportesPage({
           </div>
 
           <div className="text-center pb-3 border-b-2 border-slate-800 mb-4 space-y-1">
+            <img src="/logo-15-de-abril.jpg" alt="Logo 15 de Abril" className="w-14 h-14 object-contain mx-auto mb-1" />
             <h3 className="font-extrabold text-base tracking-wider uppercase text-slate-900">
               RADIO MÓVIL 15 DE ABRIL
             </h3>
@@ -859,6 +865,7 @@ export default function ReportesPage({
           </div>
 
           <div className="text-center pb-3 border-b-2 border-slate-800 mb-4 space-y-1">
+            <img src="/logo-15-de-abril.jpg" alt="Logo 15 de Abril" className="w-14 h-14 object-contain mx-auto mb-1" />
             <h3 className="font-extrabold text-base tracking-wider uppercase text-slate-900">
               RADIO MÓVIL 15 DE ABRIL
             </h3>

@@ -99,6 +99,7 @@ export default function ReceiptModal({ isOpen, onClose, data, receipt, printMode
         <div id="printable-area" className="p-6 text-xs text-slate-800 space-y-3 font-mono print:p-2 print:m-0 print:w-full">
           {/* Header */}
           <div className="text-center space-y-0.5 border-b-2 border-slate-800 pb-2">
+            <img src="/logo-15-de-abril.jpg" alt="Logo 15 de Abril" className="w-14 h-14 object-contain mx-auto mb-1.5" />
             <h2 className="font-black text-sm uppercase text-slate-900 tracking-wider">
               RADIO MÓVIL 15 DE ABRIL S.R.L.
             </h2>

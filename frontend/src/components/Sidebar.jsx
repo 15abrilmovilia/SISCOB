@@ -64,8 +64,8 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
             <div className="flex items-center space-x-3">
-              <div className="bg-red-700 text-white p-2.5 rounded-xl shadow-sm flex items-center justify-center">
-                <Landmark className="w-5 h-5" />
+              <div className="bg-white p-1 rounded-xl shadow-xs border border-slate-200 flex items-center justify-center">
+                <img src="/logo-15-de-abril.jpg" alt="Logo 15 de Abril" className="w-8 h-8 object-contain rounded-lg" />
               </div>
               <div>
                 <h2 className="font-black text-slate-900 tracking-wider text-base leading-none">SISCOB</h2>
