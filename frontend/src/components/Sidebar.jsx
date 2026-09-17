@@ -27,7 +27,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
     { id: 'cobranzas', label: 'CAJA RÁPIDA', icon: HandCoins },
     { id: 'egresos', label: 'EGRESOS', icon: TrendingDown },
     { id: 'prestamos', label: 'PRÉSTAMOS', icon: Landmark },
-    { id: 'workflow', label: 'WORKFLOW CIERRE CAJA', icon: GitPullRequest },
+    { id: 'workflow', label: 'TURNOS & CIERRE CAJA', icon: GitPullRequest },
     { id: 'balance', label: 'BALANCE POR CAJAS', icon: FileSpreadsheet },
     { id: 'almacen', label: 'ALMACÉN / KARDEX', icon: Package },
     { id: 'reportes', label: 'MATRIZ REPORTES', icon: FileSpreadsheet },

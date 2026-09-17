@@ -18,12 +18,18 @@ import {
   Edit3,
   PlusCircle,
   Tag,
-  User
+  User,
+  Lock,
+  Unlock,
+  Send,
+  Calculator,
+  ShieldCheck
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import CobroDirectoModal from '../components/CobroDirectoModal';
 import { registrarCobranzaAPI, anularCobranzaAPI } from '../utils/api';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
+import { DENOMINACIONES_BILLETES } from '../utils/turnosHelper';
 
 const INITIAL_HISTORIAL_RECIBOS = [
   {
@@ -58,7 +64,9 @@ export default function CobranzasPage({
   printMode,
   recibos,
   setRecibos,
-  currentUser
+  currentUser,
+  turnoActivo,
+  setTurnoActivo
 }) {
   // Navigation: 'cobro' (Ventanilla) | 'historial' (Recibos emitidos)
   const [activeSubTab, setActiveSubTab] = useState('cobro');
@@ -97,6 +105,40 @@ export default function CobranzasPage({
 
   // Estado para Modal de Cobro Directo de Conceptos (Logos, Donaciones, etc.)
   const [isCobroDirectoOpen, setIsCobroDirectoOpen] = useState(false);
+  // ── Control de Turno y Restricción de Operadora ──
+  const isAdmin = currentUser?.rol === 'admin' || currentUser?.rol === 'admin33';
+  const isOperadoraHabilitada = isAdmin || (turnoActivo && turnoActivo.estado === 'HABILITADO_ACTIVO');
+
+  const [isEntregaModalOpen, setIsEntregaModalOpen] = useState(false);
+  const [billetesEntrega, setBilletesEntrega] = useState({
+    200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0, 0.5: 0
+  });
+  const [observacionesEntrega, setObservacionesEntrega] = useState('');
+
+  const totalBilletesDeclarado = Object.entries(billetesEntrega).reduce((acc, [valor, cant]) => {
+    return acc + (parseFloat(valor) * (parseInt(cant) || 0));
+  }, 0);
+
+  const handleConfirmEntregaTurno = () => {
+    if (!turnoActivo) return;
+    const turnoActualizado = {
+      ...turnoActivo,
+      estado: 'ENTREGADO_PENDIENTE_CUADRE',
+      fechaCierre: new Date().toISOString(),
+      arqueoOperadora: {
+        billetes: billetesEntrega,
+        totalDeclarado: totalBilletesDeclarado,
+        observaciones: observacionesEntrega || 'Entrega regular de turno'
+      }
+    };
+    if (setTurnoActivo) {
+      setTurnoActivo(turnoActualizado);
+    }
+    saveToStorage('siscob_turno_operadora_activo', turnoActualizado);
+    setIsEntregaModalOpen(false);
+    alert('✅ Turno entregado exitosamente. La caja ha quedado cerrada a la espera del cuadre de la Administradora.');
+  };
+
 
   const handleCobroDirectoAgregado = (nuevoItem) => {
     if (setDeudas) {
@@ -209,6 +251,7 @@ export default function CobranzasPage({
       cajaId: chosenCaja.id,
       cajaNombre: chosenCaja.nombre,
       observaciones: nroTransaccion ? `${observaciones ? observaciones + ' • ' : ''}Doc Banco: ${nroTransaccion}` : observaciones,
+      turnoId: turnoActivo?.id || null,
       estado: 'VIGENTE',
       deudaIds: [...selectedDeudaIds]
     };
@@ -433,6 +476,59 @@ export default function CobranzasPage({
       {/* ========================================================================= */}
       {activeSubTab === 'cobro' && (
         <div className="space-y-4">
+
+          {/* Banner de Control de Turno y Custodia de Caja */}
+          {!isOperadoraHabilitada ? (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 shadow-xs flex items-center justify-between gap-4">
+              <div className="flex items-start space-x-3">
+                <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-xs shrink-0">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-amber-950 uppercase tracking-wide">
+                    Ventanilla de Cobro No Habilitada
+                  </h3>
+                  <p className="text-xs text-amber-900 mt-1 max-w-2xl leading-relaxed">
+                    Su usuario de <strong>Operadora</strong> no tiene un turno de cobro habilitado por la Administradora en este momento.
+                    Puede consultar los socios y sus deudas, pero la recepción de pagos está bloqueada hasta que la Administradora active su turno (Almuerzo, Noche o Fin de Semana).
+                  </p>
+                </div>
+              </div>
+              <span className="bg-amber-200 text-amber-950 text-xs font-black px-3 py-1.5 rounded-xl uppercase shrink-0">
+                🔒 Bloqueado
+              </span>
+            </div>
+          ) : (!isAdmin && turnoActivo) ? (
+            <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-xs">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-black text-emerald-950 uppercase text-xs">
+                      Turno Activo: {turnoActivo.horarioLabel}
+                    </span>
+                    <span className="bg-emerald-200 text-emerald-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      Habilitado por Administración
+                    </span>
+                  </div>
+                  <p className="text-emerald-800 text-[11px] mt-0.5">
+                    Fondo de Cambio Inicial: <strong>Bs {parseFloat(turnoActivo.fondoCambio || 0).toFixed(2)}</strong> • Responsable: {currentUser?.nombre}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEntregaModalOpen(true)}
+                className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-black text-xs transition shadow-xs flex items-center space-x-2 cursor-pointer active:scale-95"
+              >
+                <Send className="w-4 h-4" />
+                <span>Entregar / Cerrar Mi Turno</span>
+              </button>
+            </div>
+          ) : null}
+
           {/* Top Header: Search Socio & Mode Radio */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -704,9 +800,9 @@ export default function CobranzasPage({
               </button>
               <button
                 onClick={handleCobrar}
-                disabled={selectedItems.length === 0}
+                disabled={!isOperadoraHabilitada || selectedItems.length === 0}
                 className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-black shadow-xs transition ${
-                  selectedItems.length > 0 
+                  isOperadoraHabilitada && selectedItems.length > 0 
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95' 
                     : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                 }`}

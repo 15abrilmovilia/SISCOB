@@ -133,6 +133,22 @@ export default function App() {
     saveToStorage(STORAGE_KEYS.RECIBOS, recibos);
   }, [recibos]);
 
+  // ── Control de Turnos de Operadoras y Custodia de Caja ──
+  const [turnoActivo, setTurnoActivo] = useState(() => 
+    loadFromStorage('siscob_turno_operadora_activo', null)
+  );
+  const [historialTurnos, setHistorialTurnos] = useState(() => 
+    loadFromStorage('siscob_historial_turnos', [])
+  );
+
+  useEffect(() => {
+    saveToStorage('siscob_turno_operadora_activo', turnoActivo);
+  }, [turnoActivo]);
+
+  useEffect(() => {
+    saveToStorage('siscob_historial_turnos', historialTurnos);
+  }, [historialTurnos]);
+
   // Sync with Supabase on mount
   useEffect(() => {
     async function syncCloud() {
@@ -310,6 +326,8 @@ export default function App() {
     saveToStorage(STORAGE_KEYS.CAJAS, nuevasCajas);
     saveToStorage('siscob_cierres_workflow', []);
     localStorage.removeItem('siscob_cierres_workflow');
+    setTurnoActivo(null);
+    localStorage.removeItem('siscob_turno_operadora_activo');
 
     // 3. Ejecutar reinicio contable en backend/Supabase
     try {
@@ -521,6 +539,8 @@ export default function App() {
               recibos={recibos}
               setRecibos={setRecibos}
               currentUser={currentUser}
+              turnoActivo={turnoActivo}
+              setTurnoActivo={setTurnoActivo}
             />
           )}
           {activeTab === 'egresos' && (
@@ -553,6 +573,11 @@ export default function App() {
               cajas={cajas}
               recibos={recibos}
               egresos={egresos}
+              usuarios={usuarios}
+              turnoActivo={turnoActivo}
+              setTurnoActivo={setTurnoActivo}
+              historialTurnos={historialTurnos}
+              setHistorialTurnos={setHistorialTurnos}
             />
           )}
           {activeTab === 'balance' && (
