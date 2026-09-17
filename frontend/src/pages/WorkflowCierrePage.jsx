@@ -1,22 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck, Clock, CheckCircle2, AlertTriangle,
   XCircle, Lock, Unlock, FileText, Printer,
   FileCheck2, Send, Users, ChevronRight, UserCheck,
-  Dices, Plus, Trash2, Edit2, Save, Sparkles, Check
+  Dices, Plus, Trash2, Edit2, Save, Sparkles, Check,
+  RefreshCw, RotateCcw, Landmark
 } from 'lucide-react';
 import { 
   ESTADOS_CIERRE, 
   ROLES_WORKFLOW, 
-  INITIAL_CIERRES, 
   DEFAULT_COMISIONES_MES 
 } from '../utils/workflowCaja';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 
-export default function WorkflowCierrePage({ socios = [], currentUser }) {
+export default function WorkflowCierrePage({ 
+  socios = [], 
+  currentUser,
+  cajas = [],
+  recibos = [],
+  egresos = []
+}) {
   const [activeRole, setActiveRole] = useState(ROLES_WORKFLOW.SECRETARIA);
-  const [cierres, setCierres] = useState(INITIAL_CIERRES);
-  const [selectedCierreId, setSelectedCierreId] = useState('CC-2026-09-02-T1');
+  const [cajaFiltroId, setCajaFiltroId] = useState('c1'); // 'c1'..'c5' o 'todas'
   const [observacionInput, setObservacionInput] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [modalActionType, setModalActionType] = useState('');
@@ -30,7 +35,150 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
   const [tempMiembros, setTempMiembros] = useState([]);
   const [sorteoNotif, setSorteoNotif] = useState('');
 
-  const selectedCierre = cierres.find(c => c.id === selectedCierreId) || cierres[0];
+  // ── Cálculos con Datos REALES del Sistema ──
+  const selectedCajaObj = useMemo(() => {
+    if (cajaFiltroId === 'todas') {
+      const saldoAnterior = cajas.reduce((acc, c) => acc + (parseFloat(c.saldoAnterior) || 0), 0);
+      const ingresos = cajas.reduce((acc, c) => acc + (parseFloat(c.ingresos) || 0), 0);
+      const egresosTot = cajas.reduce((acc, c) => acc + (parseFloat(c.egresos) || 0), 0);
+      const saldoActual = cajas.reduce((acc, c) => acc + (parseFloat(c.saldoActual) || 0), 0);
+      return {
+        id: 'todas',
+        nombre: 'Consolidado Institucional (Todas las Cajas)',
+        saldoAnterior,
+        ingresos,
+        egresos: egresosTot,
+        saldoActual
+      };
+    }
+    return cajas.find(c => c.id === cajaFiltroId) || cajas[0] || {
+      id: 'c1',
+      nombre: 'Caja 1 — Cuotas de Frecuencia',
+      saldoAnterior: 0,
+      ingresos: 0,
+      egresos: 0,
+      saldoActual: 0
+    };
+  }, [cajas, cajaFiltroId]);
+
+  // Recibos reales vigentes del período
+  const recibosFiltrados = useMemo(() => {
+    return (recibos || []).filter(r => 
+      r.estado !== 'ANULADO' && (cajaFiltroId === 'todas' || r.cajaId === cajaFiltroId)
+    );
+  }, [recibos, cajaFiltroId]);
+
+  // Egresos reales del período
+  const egresosFiltrados = useMemo(() => {
+    return (egresos || []).filter(e => 
+      cajaFiltroId === 'todas' || e.cajaId === cajaFiltroId
+    );
+  }, [egresos, cajaFiltroId]);
+
+  // Creador de Cierre en Vivo basado en los datos del sistema
+  const generarCierreEnVivo = () => {
+    const comisionActual = comisionesPorMes['Septiembre 2026'] || DEFAULT_COMISIONES_MES['Septiembre 2026'];
+    const saldoInicial = parseFloat(selectedCajaObj.saldoAnterior) || 0;
+    const totalIngresos = parseFloat(selectedCajaObj.ingresos) || 0;
+    const totalEgresos = parseFloat(selectedCajaObj.egresos) || 0;
+    const saldoTeorico = saldoInicial + totalIngresos - totalEgresos;
+    const comprobantesCount = recibosFiltrados.length + egresosFiltrados.length;
+
+    const fechaHoy = new Date().toLocaleDateString('es-BO');
+    const cobradorInicial = (currentUser?.rol === 'admin' || currentUser?.rol === 'admin33')
+      ? { id: currentUser?.id || 'admin01', nombre: currentUser?.nombre || 'Administrador Central', cargo: 'Administrador / Cobrador', ip: '192.168.100.5' }
+      : { id: 'cajera01', nombre: currentUser?.nombre || 'Daniela Alarcón', cargo: 'Operadora / Cajera', ip: '192.168.100.14' };
+
+    return {
+      id: 'CC-' + new Date().toISOString().slice(0, 10) + '-T1',
+      cajaId: selectedCajaObj.id,
+      cajaNombre: selectedCajaObj.nombre,
+      turno: 'Turno Activo (' + new Date().toLocaleDateString('es-BO') + ')',
+      fecha: fechaHoy,
+      mesReporte: 'Septiembre 2026',
+      cajero: cobradorInicial,
+      secretaria: { id: 'sec01', nombre: 'Ing. Carlos Mendoza', cargo: 'Secretaría de Administración', ip: '192.168.100.5' },
+      tesorero: { id: 'tes01', nombre: 'Lic. Ramiro Paredes', cargo: 'Tesorero del Sindicato', ip: '192.168.100.2' },
+      comisionRevisora: comisionActual,
+      estado: totalIngresos > 0 || totalEgresos > 0 ? ESTADOS_CIERRE.OPERACIONES_REGISTRADAS : ESTADOS_CIERRE.ABIERTA,
+      saldoInicial,
+      totalIngresos,
+      totalEgresos,
+      saldoTeorico,
+      efectivoFisicoContado: saldoTeorico,
+      diferencia: 0.0,
+      comprobantesValidados: comprobantesCount,
+      observacionesCajero: comprobantesCount > 0 
+        ? 'Turno con ' + comprobantesCount + ' operaciones registradas en el sistema.' 
+        : 'Caja limpia / Puesta a cero sin operaciones previas registradas.',
+      observacionesSecretaria: '',
+      observacionesTesorero: '',
+      observacionesComision: '',
+      bloqueadoEdicion: false,
+      auditoriaLogs: [
+        {
+          id: 1,
+          fecha: new Date().toLocaleString('es-BO'),
+          usuario: cobradorInicial.nombre,
+          rol: cobradorInicial.cargo.includes('Administrador') ? 'admin_cobrador' : 'cajero',
+          cargo: cobradorInicial.cargo,
+          ip: cobradorInicial.ip,
+          accion: 'APERTURA_CON_SALDOS_SISTEMA',
+          estadoAnterior: null,
+          estadoNuevo: ESTADOS_CIERRE.ABIERTA,
+          observacion: 'Apertura de turno sincronizada con saldos reales de caja (Saldo base: Bs ' + saldoInicial.toFixed(2) + ')'
+        }
+      ]
+    };
+  };
+
+  // Cargar cierres guardados o generar el cierre en vivo
+  const [cierres, setCierres] = useState(() => {
+    const saved = loadFromStorage('siscob_cierres_workflow', null);
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      return saved;
+    }
+    return [generarCierreEnVivo()];
+  });
+
+  const [selectedCierreId, setSelectedCierreId] = useState(() => cierres[0]?.id || 'CC-ACTIVO');
+
+  // Mantener el cierre activo actualizado con los saldos reales si aún está abierto
+  const selectedCierre = useMemo(() => {
+    return cierres.find(c => c.id === selectedCierreId) || cierres[0] || generarCierreEnVivo();
+  }, [cierres, selectedCierreId]);
+
+  // Si el usuario cambia de caja seleccionada, actualizar los saldos del cierre si no fue consolidado
+  const handleSincronizarConSistema = () => {
+    const nuevoCierre = generarCierreEnVivo();
+    setCierres(prev => [nuevoCierre, ...prev.filter(c => c.id !== nuevoCierre.id)]);
+    setSelectedCierreId(nuevoCierre.id);
+    saveToStorage('siscob_cierres_workflow', [nuevoCierre]);
+    alert('✅ Cierre sincronizado con los saldos REALES de las cajas del sistema.');
+  };
+
+  // Poner los cierres del workflow a cero
+  const handlePonerCierresACero = () => {
+    const confirm = window.confirm(
+      '¿Desea poner el Workflow de Cierre a CERO?\n\n' +
+      'Esto eliminará los cierres de prueba antiguos y creará un turno limpio con los saldos actuales de caja.'
+    );
+    if (!confirm) return;
+
+    localStorage.removeItem('siscob_cierres_workflow');
+    const nuevo = generarCierreEnVivo();
+    setCierres([nuevo]);
+    setSelectedCierreId(nuevo.id);
+    saveToStorage('siscob_cierres_workflow', [nuevo]);
+    alert('✅ Workflow puesto a cero. El turno actual refleja exactamente el saldo de las cajas.');
+  };
+
+  // Guardar cierres en storage cada vez que cambien
+  useEffect(() => {
+    if (cierres && cierres.length > 0) {
+      saveToStorage('siscob_cierres_workflow', cierres);
+    }
+  }, [cierres]);
 
   // Sincronizar Comisión Revisora del Cierre con los datos guardados del mes
   useEffect(() => {
@@ -197,18 +345,14 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
     setShowComisionModal(true);
   };
 
-  // Sorteo aleatorio entre los 206 socios activos (estado === 'VIG')
   const handleSorteoAleatorio = () => {
     const sociosCandidatos = socios.filter(s => s.estado !== 'BAJA' && s.estado !== 'INACTIVO');
     if (sociosCandidatos.length < 3) {
       alert('No hay suficientes socios activos registrados para realizar el sorteo.');
       return;
     }
-
-    // Mezclar aleatoriamente con Fisher-Yates
     const shuffled = [...sociosCandidatos].sort(() => 0.5 - Math.random());
     const seleccionados = shuffled.slice(0, 3);
-
     const cargos = ['Presidente Comisión', 'Secretario Comisión', 'Vocal Comisión'];
     const nuevos = seleccionados.map((s, idx) => ({
       id: s.id,
@@ -264,7 +408,6 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
   };
 
   const handleSaveComision = () => {
-    // Validar que no haya nombres vacíos
     if (tempMiembros.some(m => !m.nombre || !m.nombre.trim())) {
       alert('Por favor complete el nombre de todos los miembros de la comisión.');
       return;
@@ -278,7 +421,6 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
     setComisionesPorMes(updated);
     saveToStorage('siscob_comision_revisora', updated);
 
-    // Actualizar también el cierre activo
     setCierres(prev => prev.map(c => 
       c.mesReporte === editingMes 
         ? { ...c, comisionRevisora: tempMiembros } 
@@ -292,7 +434,7 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
   // Badge de estado
   const renderBadge = (estado) => {
     const badges = {
-      [ESTADOS_CIERRE.ABIERTA]: <span className="bg-slate-100 text-slate-800 border border-slate-300 px-2.5 py-1 rounded-full text-xs font-bold">Abierta</span>,
+      [ESTADOS_CIERRE.ABIERTA]: <span className="bg-slate-100 text-slate-800 border border-slate-300 px-2.5 py-1 rounded-full text-xs font-bold">Abierta / En Curso</span>,
       [ESTADOS_CIERRE.OPERACIONES_REGISTRADAS]: <span className="bg-blue-100 text-blue-800 border border-blue-200 px-2.5 py-1 rounded-full text-xs font-bold">Operaciones Registradas</span>,
       [ESTADOS_CIERRE.CIERRE_SOLICITADO]: <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-full text-xs font-black flex items-center animate-pulse"><Clock className="w-3.5 h-3.5 mr-1"/>Pendiente Secretaría</span>,
       [ESTADOS_CIERRE.REVISADO_SECRETARIA]: <span className="bg-cyan-100 text-cyan-900 border border-cyan-300 px-2.5 py-1 rounded-full text-xs font-black flex items-center"><CheckCircle2 className="w-3.5 h-3.5 mr-1"/>Revisado — Pendiente Tesorero</span>,
@@ -364,6 +506,50 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
         </div>
       </div>
 
+      {/* Barra de Control de Saldos Reales y Caja Objetivo */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 no-print">
+        <div className="flex items-center space-x-3 flex-1 min-w-[280px]">
+          <Landmark className="w-5 h-5 text-red-700 shrink-0" />
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase block">Caja Vinculada para este Cierre:</span>
+            <select
+              value={cajaFiltroId}
+              onChange={(e) => setCajaFiltroId(e.target.value)}
+              className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="c1">Caja 1 — Frecuencia Mensual (Propietarios)</option>
+              <option value="c2">Caja 2 — Multas e Infracciones</option>
+              <option value="c3">Caja 3 — Nuevos Socios / Inscripciones</option>
+              <option value="c4">Caja 4 — Cartera y Préstamos</option>
+              <option value="c5">Caja 5 — Frecuencia Inquilinos</option>
+              <option value="todas">⭐ Consolidado General (Todas las 5 Cajas)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={handleSincronizarConSistema}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+            title="Actualiza los números del acta con los ingresos y egresos reales registrados en el sistema"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+            <span>Sincronizar Saldos Reales</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePonerCierresACero}
+            className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+            title="Limpia datos anteriores del workflow y deja el turno a cero coincidiendo con la Puesta a Cero contable"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+            <span>Poner Workflow a CERO</span>
+          </button>
+        </div>
+      </div>
+
       {/* Grid principal */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
@@ -380,7 +566,7 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                 </h3>
               </div>
               <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {selectedCierre.comisionRevisora.length} Miembros
+                {(selectedCierre.comisionRevisora || []).length} Miembros
               </span>
             </div>
             <p className="text-[11px] text-amber-800">
@@ -396,7 +582,7 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
           </div>
 
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex justify-between items-center">
-            <h3 className="font-extrabold text-sm uppercase tracking-wide text-slate-900">Cierres de Turno</h3>
+            <h3 className="font-extrabold text-sm uppercase tracking-wide text-slate-900">Expedientes de Cierre</h3>
             <span className="text-xs font-bold text-red-700 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">{cierres.length} Turnos</span>
           </div>
 
@@ -419,7 +605,9 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                 </div>
                 <div className="flex justify-between text-xs font-mono pt-2 border-t border-slate-100">
                   <span className="text-slate-500">Saldo Teórico:</span>
-                  <strong className="text-slate-900">Bs {c.saldoTeorico.toFixed(2)}</strong>
+                  <strong className={c.saldoTeorico === 0 ? "text-slate-400" : "text-slate-900 font-bold"}>
+                    Bs {c.saldoTeorico.toFixed(2)}
+                  </strong>
                 </div>
               </div>
             ))}
@@ -497,18 +685,18 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
               </button>
             </div>
 
-            {/* Resumen financiero */}
+            {/* Resumen financiero — 100% REAL conectado a las Cajas del Sistema */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-[10px] text-slate-500 block uppercase font-bold">Saldo Apertura:</span>
                 <strong className="text-slate-800 text-sm">Bs {selectedCierre.saldoInicial.toFixed(2)}</strong>
               </div>
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900">
-                <span className="text-[10px] text-emerald-700 block uppercase font-bold">(+) Ingresos:</span>
+                <span className="text-[10px] text-emerald-700 block uppercase font-bold">(+) Ingresos Cobrados:</span>
                 <strong className="text-sm">Bs {selectedCierre.totalIngresos.toFixed(2)}</strong>
               </div>
               <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-rose-900">
-                <span className="text-[10px] text-rose-700 block uppercase font-bold">(-) Egresos:</span>
+                <span className="text-[10px] text-rose-700 block uppercase font-bold">(-) Egresos Pagados:</span>
                 <strong className="text-sm">Bs {selectedCierre.totalEgresos.toFixed(2)}</strong>
               </div>
               <div className="p-3 bg-slate-900 text-white rounded-xl">
@@ -517,7 +705,7 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
               </div>
             </div>
 
-            {/* Arqueo físico */}
+            {/* Arqueo físico vs Teórico */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
               <div>
                 <span className="text-[10px] text-slate-500 block font-bold uppercase">Efectivo Físico Contado:</span>
@@ -578,7 +766,7 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {selectedCierre.comisionRevisora.map((m, i) => (
+                {(selectedCierre.comisionRevisora || []).map((m, i) => (
                   <div key={i} className="bg-white border border-amber-200 rounded-lg p-2.5 text-xs space-y-0.5">
                     <div className="flex justify-between items-start">
                       <strong className="text-slate-900 block font-bold text-[11px]">{m.nombre}</strong>
@@ -632,7 +820,7 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                   Miembros de la Comisión Revisora — {selectedCierre.mesReporte}:
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center text-[10px]">
-                  {selectedCierre.comisionRevisora.map((m, idx) => (
+                  {(selectedCierre.comisionRevisora || []).map((m, idx) => (
                     <div key={idx} className="border-t border-amber-400 pt-1">
                       <strong className="block text-slate-800">{m.nombre}</strong>
                       <span className="text-amber-800 font-semibold uppercase block">Móvil #{m.nroMovil} • {m.cargo}</span>
@@ -661,7 +849,7 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
 
               {/* Cajera o Admin Cobrador: solicitar cierre */}
               {(activeRole === ROLES_WORKFLOW.CAJERO || activeRole === ROLES_WORKFLOW.ADMIN_COBRADOR) && 
-               selectedCierre.estado === ESTADOS_CIERRE.OPERACIONES_REGISTRADAS && (
+               (selectedCierre.estado === ESTADOS_CIERRE.OPERACIONES_REGISTRADAS || selectedCierre.estado === ESTADOS_CIERRE.ABIERTA) && (
                 <button onClick={handleSolicitarCierre}
                   className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shadow-xs">
                   <Send className="w-3.5 h-3.5"/><span>Solicitar Cierre y Bloquear Caja</span>
@@ -762,13 +950,10 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MODAL: ASIGNAR / SORTEAR COMISIÓN REVISORA DEL MES                        */}
-      {/* ========================================================================= */}
+      {/* MODAL: ASIGNAR / SORTEAR COMISIÓN REVISORA DEL MES */}
       {showComisionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 text-xs">
-            {/* Header Modal */}
             <div className="bg-gradient-to-r from-amber-700 to-amber-900 text-white p-5 flex justify-between items-center">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-amber-600 rounded-xl">
@@ -787,14 +972,12 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
             </div>
 
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              {/* Notificación de Sorteo */}
               {sorteoNotif && (
                 <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 font-bold text-xs flex items-center space-x-2 animate-bounce">
                   <span>{sorteoNotif}</span>
                 </div>
               )}
 
-              {/* Botón de Sorteo Automático */}
               <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h4 className="font-extrabold text-amber-950 text-xs flex items-center gap-1.5">
@@ -815,7 +998,6 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                 </button>
               </div>
 
-              {/* Selector de Mes */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1 uppercase text-[10px]">
                   Mes del Período a Asignar:
@@ -829,7 +1011,6 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                 />
               </div>
 
-              {/* Lista de Miembros */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="block font-bold text-slate-700 uppercase text-[10px]">
@@ -862,7 +1043,6 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                      {/* Dropdown elegir del padrón de socios */}
                       <div className="sm:col-span-5">
                         <label className="block text-[10px] text-slate-500 font-bold mb-0.5">
                           Seleccionar del Padrón de Socios:
@@ -881,7 +1061,6 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                         </select>
                       </div>
 
-                      {/* Nombre completo */}
                       <div className="sm:col-span-4">
                         <label className="block text-[10px] text-slate-500 font-bold mb-0.5">
                           Nombre Completo:
@@ -895,7 +1074,6 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                         />
                       </div>
 
-                      {/* Cargo */}
                       <div className="sm:col-span-3">
                         <label className="block text-[10px] text-slate-500 font-bold mb-0.5">
                           Cargo / Rol:
@@ -922,7 +1100,6 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                 ))}
               </div>
 
-              {/* Botones de acción modal */}
               <div className="pt-3 flex justify-end space-x-2 border-t border-slate-200">
                 <button
                   type="button"
@@ -967,7 +1144,7 @@ export default function WorkflowCierrePage({ socios = [], currentUser }) {
                 {modalActionType === 'rechazar' && 'Indique el motivo del rechazo. La cajera o cobrador podrá corregir y reenviar.'}
                 {modalActionType === 'aprobar_secretaria' && 'Certifica que revisó las operaciones del turno y están conformes.'}
                 {modalActionType === 'aprobar_tesorero' && 'Como Tesorero del Sindicato, aprueba este cierre de caja y lo envía a la Comisión Revisora.'}
-                {modalActionType === 'visto_bueno_comision' && 'La Comisión Revisora del mes (' + selectedCierre.comisionRevisora.map(m=>m.nombre).join(', ') + ') otorga el visto bueno final. Este acta quedará consolidada en los balances del sindicato.'}
+                {modalActionType === 'visto_bueno_comision' && 'La Comisión Revisora del mes (' + (selectedCierre.comisionRevisora || []).map(m=>m.nombre).join(', ') + ') otorga el visto bueno final. Este acta quedará consolidada en los balances del sindicato.'}
               </p>
               <div>
                 <label className="block font-bold text-slate-700 mb-1">

@@ -308,6 +308,8 @@ export default function App() {
     saveToStorage(STORAGE_KEYS.PRESTAMOS, []);
     saveToStorage(STORAGE_KEYS.RECIBOS, []);
     saveToStorage(STORAGE_KEYS.CAJAS, nuevasCajas);
+    saveToStorage('siscob_cierres_workflow', []);
+    localStorage.removeItem('siscob_cierres_workflow');
 
     // 3. Ejecutar reinicio contable en backend/Supabase
     try {
@@ -548,6 +550,9 @@ export default function App() {
             <WorkflowCierrePage 
               socios={socios}
               currentUser={currentUser}
+              cajas={cajas}
+              recibos={recibos}
+              egresos={egresos}
             />
           )}
           {activeTab === 'balance' && (
