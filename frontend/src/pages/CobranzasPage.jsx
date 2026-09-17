@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import CobroDirectoModal from '../components/CobroDirectoModal';
-import { registrarCobranzaAPI, anularCobranzaAPI } from '../utils/api';
+import { registrarCobranzaAPI, anularCobranzaAPI, entregarTurnoAPI } from '../utils/api';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { DENOMINACIONES_BILLETES } from '../utils/turnosHelper';
 
@@ -135,6 +135,14 @@ export default function CobranzasPage({
       setTurnoActivo(turnoActualizado);
     }
     saveToStorage('siscob_turno_operadora_activo', turnoActualizado);
+    // Sincronizar con Supabase / Railway
+    entregarTurnoAPI({
+      id: turnoActivo.id,
+      billetesDeclarados: billetesEntrega,
+      totalEfectivoDeclarado: totalBilletesDeclarado,
+      notasEntrega: observacionesEntrega || 'Entrega regular de turno',
+      fechaEntrega: new Date().toISOString()
+    });
     setIsEntregaModalOpen(false);
     alert('✅ Turno entregado exitosamente. La caja ha quedado cerrada a la espera del cuadre de la Administradora.');
   };

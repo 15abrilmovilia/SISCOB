@@ -19,6 +19,7 @@ import {
   generarMensajeWhatsAppTurno 
 } from '../utils/turnosHelper';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
+import { habilitarTurnoAPI, aprobarTurnoAPI } from '../utils/api';
 
 export default function WorkflowCierrePage({ 
   socios = [], 
@@ -114,6 +115,8 @@ export default function WorkflowCierrePage({
       setTurnoActivo(nuevoTurno);
     }
     saveToStorage('siscob_turno_operadora_activo', nuevoTurno);
+    // Sincronizar con Supabase / Railway
+    habilitarTurnoAPI(nuevoTurno);
     setShowHabilitarModal(false);
     alert('✅ Turno habilitado con éxito para ' + nuevoTurno.operadoraNombre + '. La operadora ya puede cobrar en su horario.');
   };
@@ -194,6 +197,17 @@ export default function WorkflowCierrePage({
       }
       saveToStorage('siscob_turno_operadora_activo', null);
     }
+
+    // Sincronizar con Supabase / Railway
+    aprobarTurnoAPI({
+      id: turnoFinalizado.id,
+      aprobadoPor: currentUser?.nombre || 'Administrador Central',
+      notasAprobacion: observacionesCuadre || 'Cuadre conforme',
+      resumenFinanciero: resumenTurnoEnCuadre,
+      fechaCierre: new Date().toISOString(),
+      billetesDeclarados: billetesCuadre,
+      totalEfectivoDeclarado: totalEfectivoContadoCuadre
+    });
 
     setShowCuadreModal(false);
     setComprobanteImprimir({ turno: turnoFinalizado, resumen: resumenTurnoEnCuadre });

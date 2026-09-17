@@ -338,3 +338,73 @@ export async function getPortalHistorialAPI(socioId) {
   }
 }
 
+// ── Turnos de Guardia & Custodia de Caja (Cloudflare <-> Railway <-> Supabase) ──
+
+export async function getTurnoActivoAPI() {
+  try {
+    const res = await fetch(`${API_BASE}/api/turnos/activo`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al obtener turno activo remoto:', err.message);
+    return null;
+  }
+}
+
+export async function habilitarTurnoAPI(turnoData) {
+  try {
+    const res = await fetch(`${API_BASE}/api/turnos/habilitar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(turnoData)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[SISCOB API] Error al habilitar turno en nube:', err.message);
+    return null;
+  }
+}
+
+export async function entregarTurnoAPI(entregaData) {
+  try {
+    const res = await fetch(`${API_BASE}/api/turnos/entregar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entregaData)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[SISCOB API] Error al registrar entrega de turno en nube:', err.message);
+    return null;
+  }
+}
+
+export async function aprobarTurnoAPI(aprobacionData) {
+  try {
+    const res = await fetch(`${API_BASE}/api/turnos/aprobar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(aprobacionData)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[SISCOB API] Error al aprobar turno en nube:', err.message);
+    return null;
+  }
+}
+
+export async function getHistorialTurnosAPI() {
+  try {
+    const res = await fetch(`${API_BASE}/api/turnos/historial`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al obtener historial de turnos remoto:', err.message);
+    return [];
+  }
+}
+
+

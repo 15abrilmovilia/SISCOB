@@ -90,3 +90,23 @@ CREATE TABLE IF NOT EXISTS auditoria_logs (
     detalle TEXT NOT NULL,
     estado VARCHAR(30) NOT NULL DEFAULT 'EXITOSO'
 );
+
+-- 8. Tabla de Turnos de Guardia y Custodia de Ventanilla
+CREATE TABLE IF NOT EXISTS turnos_guardia (
+    id VARCHAR(80) PRIMARY KEY,
+    operadora VARCHAR(100) NOT NULL,
+    operadora_id VARCHAR(50),
+    tipo_horario VARCHAR(100) NOT NULL,
+    fondo_cambio NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    estado VARCHAR(50) NOT NULL DEFAULT 'ACTIVO', -- HABILITADO_ACTIVO, ENTREGADO_PENDIENTE_CUADRE, APROBADO_CERRADO
+    fecha_inicio TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    fecha_entrega TIMESTAMP WITH TIME ZONE,
+    fecha_cierre TIMESTAMP WITH TIME ZONE,
+    total_efectivo_declarado NUMERIC(12, 2) DEFAULT 0.00,
+    billetes_declarados JSONB,
+    notas_entrega TEXT,
+    aprobado_por VARCHAR(100),
+    notas_aprobacion TEXT,
+    resumen_financiero JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

@@ -166,6 +166,36 @@ async function syncCajasTotals() {
   }
 }
 
+
+async function initTurnosTable() {
+  if (!pool) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS turnos_guardia (
+        id VARCHAR(80) PRIMARY KEY,
+        operadora VARCHAR(100) NOT NULL,
+        operadora_id VARCHAR(50),
+        tipo_horario VARCHAR(100) NOT NULL,
+        fondo_cambio NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+        estado VARCHAR(50) NOT NULL DEFAULT 'ACTIVO',
+        fecha_inicio TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        fecha_entrega TIMESTAMP WITH TIME ZONE,
+        fecha_cierre TIMESTAMP WITH TIME ZONE,
+        total_efectivo_declarado NUMERIC(12, 2) DEFAULT 0.00,
+        billetes_declarados JSONB,
+        notas_entrega TEXT,
+        aprobado_por VARCHAR(100),
+        notas_aprobacion TEXT,
+        resumen_financiero JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+    console.log('[SISCOB Backend] Tabla turnos_guardia sincronizada en Supabase.');
+  } catch (err) {
+    console.error('[SISCOB Backend] Error al verificar tabla turnos_guardia:', err.message);
+  }
+}
+
 if (process.env.DATABASE_URL) {
   const { Pool } = require('pg');
   pool = new Pool({
@@ -177,6 +207,7 @@ if (process.env.DATABASE_URL) {
     await seedSociosIfEmpty();
     await seedConceptosYDeudas();
     await syncCajasTotals();
+    await initTurnosTable();
   })();
 } else {
   console.log('[SISCOB Backend] Modo desarrollo local activo (sin base de datos remota conectada aún).');
@@ -1296,6 +1327,213 @@ app.get('/api/portal/historial/:socioId', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+
+// =========================================================================
+// TURNOS DE GUARDIA Y CUSTODIA DE CAJA (Supabase)
+// =========================================================================
+
+// 1. Obtener Turno Activo (o entregado pendiente de revisión del lunes)
+app.get('/api/turnos/activo', async (req, res) => {
+  if (pool) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT * FROM turnos_guardia 
+         WHERE estado IN ('ACTIVO', 'HABILITADO_ACTIVO', 'ENTREGADO_PENDIENTE_REVISION', 'ENTREGADO_PENDIENTE_CUADRE') 
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      if (rows.length > 0) {
+        const t = rows[0];
+        return res.json({
+          id: t.id,
+          operadora: t.operadora,
+          operadoraNombre: t.operadora,
+          operadoraId: t.operadora_id,
+          tipoHorario: t.tipo_horario,
+          horarioTipo: t.tipo_horario,
+          fondoCambio: parseFloat(t.fondo_cambio) || 0,
+          estado: t.estado,
+          fechaInicio: t.fecha_inicio,
+          fechaEntrega: t.fecha_entrega,
+          fechaCierre: t.fecha_cierre,
+          totalEfectivoDeclarado: parseFloat(t.total_efectivo_declarado) || 0,
+          billetesDeclarados: t.billetes_declarados || {},
+          notasEntrega: t.notas_entrega || '',
+          aprobadoPor: t.aprobado_por,
+          notasAprobacion: t.notas_aprobacion,
+          resumenFinanciero: t.resumen_financiero
+        });
+      }
+      return res.json(null);
+    } catch (err) {
+      console.error('Error al obtener turno activo:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json(null);
+});
+
+// 2. Habilitar nuevo turno de operadora
+app.post('/api/turnos/habilitar', async (req, res) => {
+  const { id, operadora, operadoraNombre, operadoraId, tipoHorario, horarioTipo, fondoCambio, observaciones, fechaInicio } = req.body;
+  const turnoId = id || `TURNO-${Date.now()}`;
+  const opNombre = operadoraNombre || operadora || 'Operadora Guardia';
+  const opId = operadoraId || 'cajero';
+  const tipoH = horarioTipo || tipoHorario || 'Personalizado';
+  const fondo = parseFloat(fondoCambio) || 200.0;
+  const fInicio = fechaInicio ? new Date(fechaInicio) : new Date();
+
+  if (pool) {
+    try {
+      await pool.query(
+        `UPDATE turnos_guardia SET estado = 'CANCELADO' 
+         WHERE estado IN ('ACTIVO', 'HABILITADO_ACTIVO')`
+      );
+
+      const query = `
+        INSERT INTO turnos_guardia (
+          id, operadora, operadora_id, tipo_horario, fondo_cambio, estado, fecha_inicio, notas_entrega
+        ) VALUES ($1, $2, $3, $4, $5, 'HABILITADO_ACTIVO', $6, $7)
+        RETURNING *;
+      `;
+      const { rows } = await pool.query(query, [
+        turnoId,
+        opNombre,
+        opId,
+        tipoH,
+        fondo,
+        fInicio,
+        observaciones || ''
+      ]);
+
+      const t = rows[0];
+      return res.json({
+        id: t.id,
+        operadora: t.operadora,
+        operadoraNombre: t.operadora,
+        operadoraId: t.operadora_id,
+        tipoHorario: t.tipo_horario,
+        horarioTipo: t.tipo_horario,
+        fondoCambio: parseFloat(t.fondo_cambio) || 0,
+        estado: t.estado,
+        fechaInicio: t.fecha_inicio
+      });
+    } catch (err) {
+      console.error('Error al habilitar turno:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ id: turnoId, operadoraNombre: opNombre, tipoHorario: tipoH, fondoCambio: fondo, estado: 'HABILITADO_ACTIVO' });
+});
+
+// 3. Operadora entrega su turno con desglose de billetes
+app.post('/api/turnos/entregar', async (req, res) => {
+  const { id, billetesDeclarados, totalEfectivoDeclarado, notasEntrega, fechaEntrega, resumenFinanciero } = req.body;
+  if (!id) return res.status(400).json({ error: 'id del turno es requerido' });
+
+  if (pool) {
+    try {
+      const query = `
+        UPDATE turnos_guardia
+        SET estado = 'ENTREGADO_PENDIENTE_CUADRE',
+            billetes_declarados = $1,
+            total_efectivo_declarado = $2,
+            notas_entrega = $3,
+            fecha_entrega = $4,
+            resumen_financiero = $5
+        WHERE id = $6
+        RETURNING *;
+      `;
+      const { rows } = await pool.query(query, [
+        JSON.stringify(billetesDeclarados || {}),
+        parseFloat(totalEfectivoDeclarado) || 0,
+        notasEntrega || '',
+        fechaEntrega ? new Date(fechaEntrega) : new Date(),
+        JSON.stringify(resumenFinanciero || {}),
+        id
+      ]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Turno no encontrado' });
+      return res.json({ success: true, turno: rows[0] });
+    } catch (err) {
+      console.error('Error al entregar turno:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true });
+});
+
+// 4. Administradora aprueba y cierra el turno (Lunes mañana)
+app.post('/api/turnos/aprobar', async (req, res) => {
+  const { id, aprobadoPor, notasAprobacion, resumenFinanciero, fechaCierre, billetesDeclarados, totalEfectivoDeclarado } = req.body;
+  if (!id) return res.status(400).json({ error: 'id del turno es requerido' });
+
+  if (pool) {
+    try {
+      const query = `
+        UPDATE turnos_guardia
+        SET estado = 'APROBADO_CERRADO',
+            aprobado_por = $1,
+            notas_aprobacion = $2,
+            resumen_financiero = $3,
+            fecha_cierre = $4,
+            billetes_declarados = COALESCE($5, billetes_declarados),
+            total_efectivo_declarado = COALESCE($6, total_efectivo_declarado)
+        WHERE id = $7
+        RETURNING *;
+      `;
+      const { rows } = await pool.query(query, [
+        aprobadoPor || 'Administración Central',
+        notasAprobacion || '',
+        JSON.stringify(resumenFinanciero || {}),
+        fechaCierre ? new Date(fechaCierre) : new Date(),
+        billetesDeclarados ? JSON.stringify(billetesDeclarados) : null,
+        totalEfectivoDeclarado !== undefined ? parseFloat(totalEfectivoDeclarado) : null,
+        id
+      ]);
+      return res.json({ success: true, turno: rows[0] });
+    } catch (err) {
+      console.error('Error al aprobar turno:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json({ success: true });
+});
+
+// 5. Historial de turnos archivados
+app.get('/api/turnos/historial', async (req, res) => {
+  if (pool) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT * FROM turnos_guardia 
+         WHERE estado = 'APROBADO_CERRADO' 
+         ORDER BY fecha_cierre DESC LIMIT 50`
+      );
+      return res.json(rows.map(t => ({
+        id: t.id,
+        operadora: t.operadora,
+        operadoraNombre: t.operadora,
+        operadoraId: t.operadora_id,
+        tipoHorario: t.tipo_horario,
+        horarioTipo: t.tipo_horario,
+        fondoCambio: parseFloat(t.fondo_cambio) || 0,
+        estado: t.estado,
+        fechaInicio: t.fecha_inicio,
+        fechaEntrega: t.fecha_entrega,
+        fechaCierre: t.fecha_cierre,
+        totalEfectivoDeclarado: parseFloat(t.total_efectivo_declarado) || 0,
+        billetesDeclarados: t.billetes_declarados || {},
+        notasEntrega: t.notas_entrega,
+        aprobadoPor: t.aprobado_por,
+        notasAprobacion: t.notas_aprobacion,
+        resumenFinanciero: t.resumen_financiero
+      })));
+    } catch (err) {
+      console.error('Error al obtener historial turnos:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  res.json([]);
 });
 
 // Start Server (using native node execution, no nodemon)

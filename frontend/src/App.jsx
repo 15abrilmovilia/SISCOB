@@ -53,7 +53,9 @@ import {
   getRecibosAPI,
   resetSistemaAPI,
   deleteDeudasPrestamosAPI,
-  createDeudaAPI
+  createDeudaAPI,
+  getTurnoActivoAPI,
+  getHistorialTurnosAPI
 } from './utils/api';
 
 // Sanitizador para asegurar que la única obligación mensual sea la Cuota de Frecuencia
@@ -166,14 +168,22 @@ export default function App() {
   useEffect(() => {
     async function syncCloud() {
       try {
-        const [cloudSocios, cloudCajas, cloudDeudas, cloudEgresos, cloudUsuarios, cloudRecibos] = await Promise.all([
+        const [cloudSocios, cloudCajas, cloudDeudas, cloudEgresos, cloudUsuarios, cloudRecibos, cloudTurnoActivo, cloudHistorialTurnos] = await Promise.all([
           getSociosAPI(),
           getCajasAPI(),
           getDeudasAPI(),
           getEgresosAPI(),
           getUsuariosAPI(),
-          getRecibosAPI()
+          getRecibosAPI(),
+          getTurnoActivoAPI(),
+          getHistorialTurnosAPI()
         ]);
+        if (cloudTurnoActivo) {
+          setTurnoActivo(cloudTurnoActivo);
+        }
+        if (Array.isArray(cloudHistorialTurnos) && cloudHistorialTurnos.length > 0) {
+          setHistorialTurnos(cloudHistorialTurnos);
+        }
         if (Array.isArray(cloudSocios) && cloudSocios.length > 0) setSocios(sanitizeSocioObligaciones(cloudSocios));
         if (Array.isArray(cloudCajas) && cloudCajas.length > 0) {
           setCajas(prevCajas => {
