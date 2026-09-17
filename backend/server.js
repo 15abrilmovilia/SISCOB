@@ -5,7 +5,31 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// CORS: Orígenes permitidos desde variable de entorno + dominios de producción fijos
+const BASE_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:3000',
+  'https://siscob.pages.dev',          // Cloudflare Pages producción
+  'https://siscob-production.up.railway.app' // Railway self-reference
+];
+const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
+  ? [...BASE_ORIGINS, ...process.env.CORS_ORIGIN.split(',').map(o => o.trim())]
+  : BASE_ORIGINS;
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permitir solicitudes sin origen (apps nativas, Postman, curl, portal móvil)
+    if (!origin) return callback(null, true);
+    // Permitir cualquier subdominio de pages.dev (previews de Cloudflare)
+    if (origin.endsWith('.pages.dev')) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS bloqueado para origen: ${origin}`));
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // Check if PostgreSQL is configured via DATABASE_URL
@@ -1031,6 +1055,12 @@ app.post('/api/sistema/reset', async (req, res) => {
 
       const { rows: sociosRows } = await pool.query('SELECT id, nro_movil FROM socios ORDER BY id ASC');
       const sociosParaCuotas = sociosRows.length > 0 ? sociosRows : NOMINA_206_SOCIOS;
+
+      // Período y fecha de vencimiento calculados dinámicamente
+      const _now = new Date();
+      const _meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const periodoActual = `${_meses[_now.getMonth()]} ${_now.getFullYear()}`;
+      const ultimoDiaMes = new Date(_now.getFullYear(), _now.getMonth() + 1, 0).toISOString().slice(0, 10);
       
       for (const s of sociosParaCuotas) {
         const movilStr = s.nro_movil || s.nroMovil || (s.id < 10 && s.id >= 0 ? `0${s.id}` : `${s.id}`);
@@ -1041,9 +1071,9 @@ app.post('/api/sistema/reset', async (req, res) => {
           s.id, 
           1, 
           `Cuota Frecuencia Mensual (Móvil ${movilStr})`, 
-          'Septiembre 2026', 
+          periodoActual, 
           200.00, 
-          '2026-09-30'
+          ultimoDiaMes
         ]);
       }
 
@@ -1111,6 +1141,161 @@ app.post('/api/sistema/reset', async (req, res) => {
     success: true, 
     message: 'Puesta a cero del dinero completada en memoria local (socios conservados).' 
   });
+});
+
+// =====================================================================
+// PORTAL DEL SOCIO — Endpoints públicos (sin autenticación de cajera)
+// =====================================================================
+
+// Asegurar que la columna qr_image existe en la tabla cajas (migración automática)
+if (pool) {
+  pool.query(`ALTER TABLE cajas ADD COLUMN IF NOT EXISTS qr_image TEXT`)
+    .then(() => console.log('[SISCOB] Columna qr_image verificada/creada en cajas'))
+    .catch(e => console.warn('[SISCOB] qr_image ya existe o error menor:', e.message));
+}
+
+// PUT /api/cajas/:id/qr — Admin sube imagen QR (base64) para una caja
+app.put('/api/cajas/:id/qr', async (req, res) => {
+  const { id } = req.params;
+  const { qrImage } = req.body; // base64 string o null para borrar
+  if (!pool) return res.status(503).json({ error: 'Sin conexión a base de datos.' });
+  try {
+    await pool.query('UPDATE cajas SET qr_image = $1 WHERE id = $2', [qrImage || null, id]);
+    return res.json({ success: true, message: `QR de caja ${id} actualizado.` });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/cajas/qr — Obtener QR images de todas las cajas
+app.get('/api/cajas/qr', async (req, res) => {
+  if (!pool) return res.json([]);
+  try {
+    const { rows } = await pool.query('SELECT id, nombre, qr_image FROM cajas ORDER BY id ASC');
+    return res.json(rows.map(c => ({ id: c.id, nombre: c.nombre, qrImage: c.qr_image || null })));
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/portal/login — Socio se autentica con CI o número de Móvil (sin contraseña)
+app.post('/api/portal/login', async (req, res) => {
+  const { ci, nroMovil } = req.body;
+  if (!ci && !nroMovil) {
+    return res.status(400).json({ error: 'Debe proporcionar CI o número de Móvil.' });
+  }
+  if (!pool) {
+    return res.status(503).json({ error: 'El servidor no tiene conexión a la base de datos en este momento.' });
+  }
+  try {
+    let query, param;
+    if (ci) {
+      query = `SELECT id, nro_movil, nombres, ap_paterno, ap_materno, ci, celular, categoria, estado FROM socios WHERE LOWER(TRIM(ci)) = LOWER(TRIM($1)) LIMIT 1`;
+      param = ci.trim();
+    } else {
+      query = `SELECT id, nro_movil, nombres, ap_paterno, ap_materno, ci, celular, categoria, estado FROM socios WHERE TRIM(nro_movil) = TRIM($1) LIMIT 1`;
+      param = nroMovil.trim();
+    }
+    const { rows } = await pool.query(query, [param]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Socio no encontrado. Verifique su CI o número de Móvil.' });
+    }
+    const s = rows[0];
+    return res.json({
+      id: s.id,
+      nroMovil: s.nro_movil,
+      nombres: s.nombres,
+      apPaterno: s.ap_paterno,
+      apMaterno: s.ap_materno || '',
+      ci: s.ci,
+      celular: s.celular || '',
+      categoria: s.categoria,
+      estado: s.estado
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/portal/deudas/:socioId — Deudas pendientes del socio + QR de cada caja
+app.get('/api/portal/deudas/:socioId', async (req, res) => {
+  const { socioId } = req.params;
+  if (!pool) return res.json({ deudas: [], cajas: [] });
+  try {
+    // Deudas pendientes del socio
+    const { rows: dRows } = await pool.query(
+      `SELECT ds.id, ds.descripcion, ds.periodo, ds.monto, ds.fecha_vencimiento,
+              c.id as concepto_id, c.nombre as concepto_nombre, c.tipo as concepto_tipo
+       FROM deudas_socio ds
+       LEFT JOIN conceptos c ON ds.concepto_id = c.id
+       WHERE ds.socio_id = $1 AND ds.pagado = false
+       ORDER BY ds.id ASC`,
+      [socioId]
+    );
+    // QR de las 5 cajas
+    const { rows: cRows } = await pool.query('SELECT id, nombre, qr_image FROM cajas ORDER BY id ASC');
+    const cajasMap = {};
+    cRows.forEach(c => { cajasMap[c.id] = { nombre: c.nombre, qrImage: c.qr_image || null }; });
+
+    // Mapear deuda → caja correspondiente según concepto_tipo
+    const tipoACaja = {
+      'Cobro': 'c1',       // Frecuencia mensual → C1
+      'Multa': 'c2',       // Multas → C2
+      'Inscripcion': 'c3', // Nuevos socios → C3
+      'Amortizacion': 'c4',// Préstamos → C4
+      'Interes': 'c4',
+    };
+
+    const deudas = dRows.map(d => {
+      const cajaId = tipoACaja[d.concepto_tipo] || 'c1';
+      const caja = cajasMap[cajaId] || { nombre: 'Caja Frecuencia', qrImage: null };
+      return {
+        id: d.id,
+        descripcion: d.descripcion,
+        periodo: d.periodo,
+        monto: parseFloat(d.monto) || 0,
+        fechaVencimiento: d.fecha_vencimiento,
+        conceptoNombre: d.concepto_nombre || d.descripcion,
+        conceptoTipo: d.concepto_tipo,
+        cajaId,
+        cajaNombre: caja.nombre,
+        qrImage: caja.qrImage
+      };
+    });
+
+    return res.json({ deudas, totalPendiente: deudas.reduce((s, d) => s + d.monto, 0) });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/portal/historial/:socioId — Últimos 15 pagos del socio
+app.get('/api/portal/historial/:socioId', async (req, res) => {
+  const { socioId } = req.params;
+  if (!pool) return res.json([]);
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.nro_recibo, r.total, r.metodo_pago, r.fecha, r.cajero,
+              ca.nombre as caja_nombre
+       FROM recibos r
+       LEFT JOIN cajas ca ON r.caja_id = ca.id
+       WHERE r.socio_id = $1
+       ORDER BY r.fecha DESC
+       LIMIT 15`,
+      [socioId]
+    );
+    const historial = rows.map(r => ({
+      nroRecibo: r.nro_recibo,
+      total: parseFloat(r.total) || 0,
+      metodoPago: r.metodo_pago,
+      fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-BO') : '',
+      cajero: r.cajero,
+      cajaNombre: r.caja_nombre || 'Caja'
+    }));
+    return res.json(historial);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // Start Server (using native node execution, no nodemon)

@@ -18,6 +18,7 @@ import AuditoriaPage from './pages/AuditoriaPage';
 import FichaTecnicaPage from './pages/FichaTecnicaPage';
 import ConfigPage from './pages/ConfigPage';
 import UsuariosRolesPage from './pages/UsuariosRolesPage';
+import PortalSocioPage from './pages/PortalSocioPage';
 import NewSocioModal from './components/NewSocioModal';
 import ReiniciarSistemaModal from './components/ReiniciarSistemaModal';
 
@@ -363,7 +364,19 @@ export default function App() {
       observaciones: newData.observaciones || "Nuevo afiliado registrado"
     };
 
-    // Guardar en Supabase a través de Railway
+    // Guardar en Supabase a través de Railway (createdRemote declarado correctamente)
+    let createdRemote = null;
+    try {
+      createdRemote = await createSocioAPI({
+        ...newSocioPayload,
+        id: assignedId,
+        customId: newData.customId,
+        nroMovil: newData.customId || String(assignedId)
+      });
+    } catch (err) {
+      console.warn('[SISCOB] No se pudo guardar remotamente, continuando en local:', err?.message);
+    }
+
     const finalId = createdRemote?.id || assignedId;
     const finalSocio = {
       id: finalId,
@@ -375,7 +388,11 @@ export default function App() {
 
     const nuevasDeudasGeneradas = [];
     const fechaHoy = new Date().toISOString().split('T')[0];
-    const mesActual = 'Septiembre 2026';
+
+    // Período dinámico calculado desde la fecha real del sistema
+    const _ahora = new Date();
+    const _meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const mesActual = `${_meses[_ahora.getMonth()]} ${_ahora.getFullYear()}`;
 
     if (newData.cuotaFrecuencia) {
       const isInquilino = newData.categoria === 'Inquilino';
@@ -419,6 +436,11 @@ export default function App() {
       console.warn('Error al actualizar socio remotamente:', err);
     }
   };
+
+  // ── Portal del Socio: accesible sin login de cajera ──
+  if (window.location.pathname === '/portal' || window.location.hash === '#/portal') {
+    return <PortalSocioPage />;
+  }
 
   if (!currentUser) {
     return <LoginScreen onLogin={handleLogin} usuarios={usuarios} roles={roles} />;

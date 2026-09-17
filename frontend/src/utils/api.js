@@ -274,3 +274,67 @@ export async function resetSistemaAPI(payloadSaldos = {}) {
     throw err;
   }
 }
+
+// =====================================================================
+// PORTAL DEL SOCIO — API Functions
+// =====================================================================
+
+export async function getCajasQrAPI() {
+  try {
+    const res = await fetch(`${API_BASE}/api/cajas/qr`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al obtener QR de cajas:', err.message);
+    return [];
+  }
+}
+
+export async function updateCajaQrAPI(cajaId, qrImageBase64) {
+  try {
+    const res = await fetch(`${API_BASE}/api/cajas/${cajaId}/qr`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ qrImage: qrImageBase64 })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('[SISCOB API] Error al actualizar QR de caja:', err.message);
+    return null;
+  }
+}
+
+export async function portalLoginAPI(ci, nroMovil) {
+  const res = await fetch(`${API_BASE}/api/portal/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ci: ci || undefined, nroMovil: nroMovil || undefined })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Error al iniciar sesión');
+  return data;
+}
+
+export async function getPortalDeudasAPI(socioId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/portal/deudas/${socioId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al obtener deudas del portal:', err.message);
+    return { deudas: [], totalPendiente: 0 };
+  }
+}
+
+export async function getPortalHistorialAPI(socioId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/portal/historial/${socioId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn('[SISCOB API] Error al obtener historial del portal:', err.message);
+    return [];
+  }
+}
+

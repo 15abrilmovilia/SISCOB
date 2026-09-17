@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Manual de Usuario SISCOB &mdash; Radio Movil 15 de Abril</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',Arial,sans-serif; font-size:11pt; color:#1e293b; background:#fff; line-height:1.6; }
+.portada { page-break-after:always; min-height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:linear-gradient(160deg,#0f172a 0%,#7f1d1d 60%,#b91c1c 100%); color:white; text-align:center; padding:60px 40px; }
+.portada .logo-circle { width:110px;height:110px;background:rgba(255,255,255,0.15);border:4px solid rgba(255,255,255,0.4);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 28px;font-size:50px; }
+.portada h1 { font-size:48pt;font-weight:900;letter-spacing:4px;margin-bottom:6px; }
+.portada .sub { font-size:13pt;font-weight:600;color:#fca5a5;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px; }
+.portada .desc { font-size:12pt;color:#cbd5e1;max-width:540px;line-height:1.7;margin-bottom:40px; }
+.portada .vbadge { display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:30px;padding:8px 28px;font-size:10pt;font-weight:700;letter-spacing:1px;margin-bottom:10px; }
+.portada .fecha { font-size:9pt;color:#94a3b8;margin-top:10px; }
+.portada .dvd { width:80px;height:4px;background:#ef4444;border-radius:4px;margin:24px auto; }
+.portada .inst { font-size:14pt;font-weight:800;letter-spacing:1px;margin-bottom:4px; }
+.portada .tag { font-size:10pt;color:#94a3b8; }
+.indice-page { page-break-after:always; padding:60px 70px; }
+.indice-page h2 { font-size:22pt;color:#7f1d1d;font-weight:900;border-bottom:3px solid #b91c1c;padding-bottom:12px;margin-bottom:30px; }
+.toc-item { display:flex;align-items:baseline;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #e2e8f0; }
+.toc-chapter { font-weight:700;color:#1e293b;font-size:11pt; }
+.toc-page { font-weight:700;color:#b91c1c;font-size:11pt;white-space:nowrap; }
+.toc-indent { padding-left:24px; }
+.toc-indent .toc-chapter { color:#475569;font-weight:500;font-size:10.5pt; }
+.toc-sh { background:#f8fafc;padding:8px 12px;margin:10px 0 4px;border-left:4px solid #b91c1c; }
+.toc-sh span { font-size:9pt;font-weight:800;color:#b91c1c;text-transform:uppercase;letter-spacing:1px; }
+.chapter { page-break-before:always; padding:50px 70px 60px; }
+.chapter-header { display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#0f172a,#1e293b);color:white;padding:24px 30px;border-radius:14px;margin-bottom:36px; }
+.chapter-icon { width:60px;height:60px;background:#b91c1c;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0; }
+.chapter-num { font-size:9pt;color:#94a3b8;font-weight:700;letter-spacing:2px;text-transform:uppercase; }
+.chapter-title { font-size:20pt;font-weight:900;margin-top:2px; }
+.chapter-desc { font-size:10pt;color:#94a3b8;margin-top:4px; }
+h3 { font-size:14pt;color:#7f1d1d;font-weight:800;margin:28px 0 12px;padding-left:12px;border-left:4px solid #b91c1c; }
+h4 { font-size:11pt;color:#1e293b;font-weight:700;margin:18px 0 8px; }
+.steps { counter-reset:step;list-style:none;margin:14px 0; }
+.steps li { counter-increment:step;display:flex;gap:14px;margin-bottom:14px;align-items:flex-start; }
+.steps li::before { content:counter(step);min-width:28px;height:28px;background:#b91c1c;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10pt;font-weight:900;flex-shrink:0;margin-top:1px; }
+.steps li .sc { flex:1; }
+.nota { background:#f0f9ff;border:1px solid #bae6fd;border-left:5px solid #0284c7;border-radius:8px;padding:12px 16px;margin:16px 0; }
+.nota strong { color:#0369a1;display:block;margin-bottom:3px;font-size:9pt;text-transform:uppercase;letter-spacing:0.5px; }
+.adv { background:#fef9c3;border:1px solid #fde047;border-left:5px solid #ca8a04;border-radius:8px;padding:12px 16px;margin:16px 0; }
+.adv strong { color:#92400e;display:block;margin-bottom:3px;font-size:9pt;text-transform:uppercase;letter-spacing:0.5px; }
+.imp { background:#fef2f2;border:1px solid #fecaca;border-left:5px solid #dc2626;border-radius:8px;padding:12px 16px;margin:16px 0; }
+.imp strong { color:#991b1b;display:block;margin-bottom:3px;font-size:9pt;text-transform:uppercase;letter-spacing:0.5px; }
+.tip { background:#f0fdf4;border:1px solid #bbf7d0;border-left:5px solid #16a34a;border-radius:8px;padding:12px 16px;margin:16px 0; }
+.tip strong { color:#15803d;display:block;margin-bottom:3px;font-size:9pt;text-transform:uppercase;letter-spacing:0.5px; }
+table { width:100%;border-collapse:collapse;margin:16px 0;font-size:10pt; }
+th { background:#0f172a;color:white;padding:10px 12px;text-align:left;font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5px; }
+td { padding:9px 12px;border-bottom:1px solid #e2e8f0; }
+tr:nth-child(even) td { background:#f8fafc; }
+.ft { display:inline-block;background:#e2e8f0;color:#334155;border-radius:4px;padding:1px 7px;font-family:monospace;font-size:9.5pt;font-weight:700; }
+.obl { color:#dc2626;font-size:8pt;font-weight:700;margin-left:4px; }
+kbd { background:#1e293b;color:#f1f5f9;border-radius:4px;padding:2px 7px;font-family:monospace;font-size:9pt; }
+.cgrid { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0; }
+.cbox { background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px; }
+.cbox .ci { font-size:22px;margin-bottom:6px; }
+.cbox .cn { font-weight:800;color:#0f172a;font-size:10.5pt;margin-bottom:3px; }
+.cbox .cd { color:#64748b;font-size:9.5pt; }
+.flow { display:flex;align-items:center;flex-wrap:wrap;gap:0;margin:16px 0; }
+.fs { background:#e2e8f0;color:#1e293b;border-radius:8px;padding:8px 14px;font-size:9.5pt;font-weight:700; }
+.fa { color:#b91c1c;font-size:16pt;font-weight:900;padding:0 6px; }
+.rb { display:inline-block;border-radius:20px;padding:3px 12px;font-size:9pt;font-weight:700; }
+.ra { background:#fef2f2;color:#991b1b;border:1px solid #fecaca; }
+.rc { background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe; }
+.rh { background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0; }
+.pf { text-align:center;font-size:8pt;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px;margin-top:40px; }
+.dt { height:1px;background:#e2e8f0;margin:24px 0; }
+p { margin-bottom:8px; }
+ul,ol { margin:10px 0 10px 24px; }
+ul li,ol li { margin-bottom:5px; }
+@page { margin:1.5cm 1.8cm; }
+@media print {
+  body { font-size:10.5pt; }
+  .portada { height:100vh; page-break-after:always; }
+  .chapter { page-break-before:always; }
+  .nb { page-break-inside:avoid; }
+  h3 { page-break-after:avoid; }
+  table { page-break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="logo-circle">&#127946;</div>
+  <div class="sub">Radio Movil 15 de Abril</div>
+  <h1>SISCOB</h1>
+  <div class="dvd"></div>
+  <p class="desc">Sistema Integral de Gestion Economica y Cobranza de Socios.<br/>
+  Guia completa para operadores: desde el primer registro hasta la generacion de reportes financieros.</p>
+  <div class="vbadge">&#128196; Manual de Usuario &mdash; Version 1.0</div>
+  <div class="fecha">Septiembre 2026 &bull; Tarija, Bolivia</div>
+  <br/><br/>
+  <div class="inst">SINDICATO RADIO MOVIL 15 DE ABRIL</div>
+  <div class="tag">Plataforma Institucional de Gestion Economica y Cobranzas</div>
+</div>
+
+<!-- INDICE -->
+<div class="indice-page">
+  <h2>&#128196; Tabla de Contenidos</h2>
+  <div class="toc-sh"><span>Introduccion</span></div>
+  <div class="toc-item"><span class="toc-chapter">1. Que es SISCOB y como acceder</span><span class="toc-page">3</span></div>
+  <div class="toc-item toc-indent"><span class="toc-chapter">Inicio de Sesion &mdash; Usuarios y Contrasenas</span><span class="toc-page">3</span></div>
+  <div class="toc-sh"><span>Modulos del Sistema</span></div>
+  <div class="toc-item"><span class="toc-chapter">2. Panel Principal (Dashboard)</span><span class="toc-page">4</span></div>
+  <div class="toc-item"><span class="toc-chapter">3. Padron de Socios</span><span class="toc-page">5</span></div>
+  <div class="toc-item toc-indent"><span class="toc-chapter">Registrar nuevo socio &bull; Editar &bull; Kardex &bull; Exportar</span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-chapter">4. Cuotas y Obligaciones</span><span class="toc-page">7</span></div>
+  <div class="toc-item toc-indent"><span class="toc-chapter">Generar cuota mensual &bull; Asignar cuota individual</span><span class="toc-page">7</span></div>
+  <div class="toc-item"><span class="toc-chapter">5. Ventanilla de Cobranzas</span><span class="toc-page">9</span></div>
+  <div class="toc-item toc-indent"><span class="toc-chapter">Registrar pago &bull; Cobro directo &bull; Anulacion</span><span class="toc-page">9</span></div>
+  <div class="toc-item"><span class="toc-chapter">6. Registro de Egresos y Gastos</span><span class="toc-page">11</span></div>
+  <div class="toc-item"><span class="toc-chapter">7. Prestamos Institucionales</span><span class="toc-page">12</span></div>
+  <div class="toc-item"><span class="toc-chapter">8. Balance de Cajas</span><span class="toc-page">13</span></div>
+  <div class="toc-item"><span class="toc-chapter">9. Reportes Financieros</span><span class="toc-page">14</span></div>
+  <div class="toc-item"><span class="toc-chapter">10. Conciliacion de Datos</span><span class="toc-page">15</span></div>
+  <div class="toc-item"><span class="toc-chapter">11. Cierre Contable del Mes</span><span class="toc-page">16</span></div>
+  <div class="toc-item"><span class="toc-chapter">12. Usuarios y Roles</span><span class="toc-page">17</span></div>
+  <div class="toc-item"><span class="toc-chapter">13. Respaldo y Restauracion</span><span class="toc-page">18</span></div>
+  <div class="toc-item"><span class="toc-chapter">14. Preguntas Frecuentes (FAQ)</span><span class="toc-page">19</span></div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Radio Movil 15 de Abril</div>
+</div>
+
+<!-- CAPITULO 1 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128274;</div>
+    <div>
+      <div class="chapter-num">Capitulo 1</div>
+      <div class="chapter-title">Que es SISCOB y Como Acceder</div>
+      <div class="chapter-desc">Inicio de sesion, usuarios y niveles de acceso</div>
+    </div>
+  </div>
+  <p><strong>SISCOB</strong> es la plataforma institucional de gestion economica del Sindicato Radio Movil 15 de Abril. Permite registrar socios, cobrar cuotas, controlar gastos, administrar prestamos y generar reportes financieros completos. Funciona en el navegador y tambien se puede instalar como app en el escritorio (PWA).</p>
+  <div class="nota"><strong>&#128187; Acceso al sistema</strong>Abrir Chrome o Edge e ingresar la direccion del sistema. El sistema tambien puede instalarse como aplicacion desde el navegador usando el icono de instalacion en la barra de direcciones.</div>
+  <h3>1.1 Inicio de Sesion</h3>
+  <p>Al abrir el sistema, aparecera la pantalla de login con el logo de SISCOB. Ingresar el usuario y contrasena asignados.</p>
+  <ol class="steps">
+    <li><div class="sc">Escribir el <strong>nombre de usuario</strong> en el campo USUARIO / OPERADOR (ej: <kbd>admin33</kbd>)</div></li>
+    <li><div class="sc">Escribir la <strong>contrasena</strong>. Usar el boton Mostrar para verla si es necesario.</div></li>
+    <li><div class="sc">Hacer clic en el boton rojo <strong>Ingresar al Sistema</strong>. Si los datos son correctos, se abrira el Panel Principal.</div></li>
+  </ol>
+  <div class="adv"><strong>&#9888;&#65039; Error de acceso</strong>Si aparece "Contrasena incorrecta", verificar que Bloq Mayus este desactivado. Si el problema persiste, contactar al administrador.</div>
+  <h3>1.2 Usuarios y Niveles de Acceso</h3>
+  <table>
+    <tr><th>Usuario</th><th>Rol</th><th>Acceso</th></tr>
+    <tr><td><kbd>admin33</kbd></td><td><span class="rb ra">Administrador</span></td><td>Acceso TOTAL: socios, cuotas, cobranzas, egresos, prestamos, reportes, configuracion, usuarios, cierre contable.</td></tr>
+    <tr><td><kbd>cajera01</kbd></td><td><span class="rb rc">Cajero(a)</span></td><td>Cobranzas, egresos, consulta de socios y deudas. Sin acceso a configuracion ni cierre contable.</td></tr>
+    <tr><td><kbd>hacienda15</kbd></td><td><span class="rb rh">Hacienda</span></td><td>Balance, reportes, conciliacion. Solo lectura en cobranzas y egresos.</td></tr>
+  </table>
+  <div class="tip"><strong>&#128161; Cerrar sesion</strong>Hacer clic en el icono de usuario en la esquina superior derecha y seleccionar "Cerrar Sesion".</div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 1: Acceso</div>
+</div>
+
+<!-- CAPITULO 2 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128202;</div>
+    <div>
+      <div class="chapter-num">Capitulo 2</div>
+      <div class="chapter-title">Panel Principal (Dashboard)</div>
+      <div class="chapter-desc">Vision general del estado financiero en tiempo real</div>
+    </div>
+  </div>
+  <p>El Dashboard es la primera pantalla que aparece tras iniciar sesion. Muestra el estado financiero actual, alertas de mora y los indicadores clave del mes en tiempo real.</p>
+  <h3>2.1 Indicadores Principales</h3>
+  <div class="cgrid nb">
+    <div class="cbox"><div class="ci">&#128181;</div><div class="cn">Total Recaudado</div><div class="cd">Suma de todos los ingresos registrados en las 5 cajas del mes activo.</div></div>
+    <div class="cbox"><div class="ci">&#128084;</div><div class="cn">Cuotas Pendientes</div><div class="cd">Total en bolivianos de cuotas de frecuencia aun no pagadas.</div></div>
+    <div class="cbox"><div class="ci">&#128184;</div><div class="cn">Liquidez Total</div><div class="cd">Saldo disponible real: Saldo Anterior + Ingresos &minus; Egresos de todas las cajas.</div></div>
+    <div class="cbox"><div class="ci">&#128101;</div><div class="cn">Socios en Mora</div><div class="cd">Numero de socios con cuotas vencidas y sin pagar en el periodo activo.</div></div>
+  </div>
+  <h3>2.2 Meta Mensual de Recaudacion</h3>
+  <p>Una barra de progreso muestra la recaudacion real vs. la meta mensual (Bs 150,000). Se actualiza con cada pago registrado.</p>
+  <h3>2.3 Alertas de Mora</h3>
+  <p>El panel lista automaticamente a los socios con cuotas de prestamo vencidas o por vencer en los proximos 5 dias. Hacer clic en <strong>Cobrar</strong> lleva directamente a la ventanilla con ese socio preseleccionado.</p>
+  <h3>2.4 Accesos Rapidos</h3>
+  <ul>
+    <li>Boton <strong>Registrar Socio</strong>: abre el modal de nuevo afiliado</li>
+    <li>Boton <strong>Cobrar</strong> en alertas de mora: va a la ventanilla de ese socio</li>
+    <li>Tarjetas de cajas: muestran el saldo actual de cada caja</li>
+  </ul>
+  <div class="nota"><strong>&#128260; Sincronizacion en la nube</strong>Los datos se sincronizan automaticamente con Supabase al abrir el sistema. Sin internet, se usan los datos guardados localmente en el navegador.</div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 2: Dashboard</div>
+</div>
+
+<!-- CAPITULO 3 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128101;</div>
+    <div>
+      <div class="chapter-num">Capitulo 3</div>
+      <div class="chapter-title">Padron de Socios</div>
+      <div class="chapter-desc">Registro, consulta, edicion y gestion del padron oficial de 206 socios</div>
+    </div>
+  </div>
+  <p>El modulo de Socios contiene el padron oficial del sindicato. Aqui se administran todos los afiliados: propietarios, inquilinos, directivos y personal pasivo.</p>
+  <h3>3.1 Registrar un Nuevo Socio</h3>
+  <ol class="steps">
+    <li><div class="sc">En la barra lateral izquierda, hacer clic en <strong>Socios</strong>. Tambien desde el boton "Registrar Socio" del Dashboard.</div></li>
+    <li><div class="sc">Hacer clic en el boton rojo <strong>+ Nuevo Socio</strong> en la esquina superior derecha.</div></li>
+    <li><div class="sc">Completar el formulario:<br/><br/>
+      <table>
+        <tr><th>Campo</th><th>Descripcion</th><th>Obligatorio</th></tr>
+        <tr><td><span class="ft">N Movil / Interno</span></td><td>Numero de movil asignado. Dejar vacio para asignacion automatica.</td><td>No</td></tr>
+        <tr><td><span class="ft">Nombres</span></td><td>Nombres completos del socio (en mayusculas preferiblemente)</td><td><span class="obl">SI</span></td></tr>
+        <tr><td><span class="ft">Apellido Paterno</span></td><td>Primer apellido</td><td><span class="obl">SI</span></td></tr>
+        <tr><td><span class="ft">Apellido Materno</span></td><td>Segundo apellido</td><td>No</td></tr>
+        <tr><td><span class="ft">C.I.</span></td><td>Cedula de identidad unica del socio</td><td><span class="obl">SI</span></td></tr>
+        <tr><td><span class="ft">Celular</span></td><td>Numero de contacto del socio</td><td>No</td></tr>
+        <tr><td><span class="ft">Placa / Vehiculo</span></td><td>Datos del vehiculo registrado</td><td>No</td></tr>
+        <tr><td><span class="ft">Categoria</span></td><td>Propietario / Inquilino / Conductor / Directorio / Pasivos</td><td>Default: Propietario</td></tr>
+        <tr><td><span class="ft">Fecha Ingreso</span></td><td>Fecha en que ingreso al sindicato (default: hoy)</td><td>No</td></tr>
+        <tr><td><span class="ft">Generar Cuota</span></td><td>Activo = genera la cuota del mes actual al registrar</td><td>Recomendado</td></tr>
+      </table>
+    </div></li>
+    <li><div class="sc">Hacer clic en <strong>Registrar Afiliado</strong>. El socio aparecera en el padron y su cuota se generara automaticamente si se activo esa opcion.</div></li>
+  </ol>
+  <div class="imp"><strong>&#128680; Cedula duplicada</strong>Si la cedula de identidad ya existe en el sistema, el registro fallara. Verificar que el socio no este ya registrado antes de crear un nuevo registro.</div>
+  <h3>3.2 Buscar y Filtrar el Padron</h3>
+  <ul>
+    <li><strong>Buscador</strong>: Por nombre, apellido, numero de movil o CI</li>
+    <li><strong>Categoria</strong>: Propietario, Inquilino, Conductor, Directorio, Pasivos</li>
+    <li><strong>Estado</strong>: Todos / Al Dia / En Mora / Suspendidos</li>
+    <li><strong>Orden</strong>: Por numero de movil (ascendente/descendente), nombre o monto de deuda</li>
+  </ul>
+  <h3>3.3 Editar Datos de un Socio</h3>
+  <ol class="steps">
+    <li><div class="sc">Localizar al socio en el padron usando el buscador.</div></li>
+    <li><div class="sc">Hacer clic en el icono de lapiz <strong>(Editar)</strong> en la fila del socio.</div></li>
+    <li><div class="sc">Modificar los campos necesarios y hacer clic en <strong>Guardar Cambios</strong>.</div></li>
+  </ol>
+  <h3>3.4 Ver el Kardex del Socio</h3>
+  <p>El Kardex es el historial completo del socio: cuotas pagadas, deudas pendientes, prestamos y observaciones.</p>
+  <ol class="steps">
+    <li><div class="sc">Hacer clic en el nombre del socio o en el icono de historial en su fila.</div></li>
+    <li><div class="sc">Se abrira el modal del Kardex con todas sus transacciones registradas.</div></li>
+    <li><div class="sc">Usar el boton <strong>Imprimir Kardex</strong> para imprimirlo o guardarlo como PDF.</div></li>
+  </ol>
+  <h3>3.5 Exportar el Padron</h3>
+  <p>Usar los botones sobre la tabla: <strong>Excel (.xlsx)</strong> descarga la hoja de calculo completa. <strong>CSV</strong> descarga en formato texto separado por comas para otros sistemas.</p>
+  <div class="tip"><strong>&#128161; Credencial del Socio</strong>Clic en el icono de tarjeta/QR para generar e imprimir la credencial oficial del socio con su numero de movil, nombre y datos de su vehiculo.</div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 3: Padron de Socios</div>
+</div>
+
+<!-- CAPITULO 4 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128197;</div>
+    <div>
+      <div class="chapter-num">Capitulo 4</div>
+      <div class="chapter-title">Cuotas y Obligaciones</div>
+      <div class="chapter-desc">Generacion masiva de cuotas mensuales y asignacion individual de obligaciones</div>
+    </div>
+  </div>
+  <p>Este modulo gestiona todas las obligaciones economicas de los socios: cuotas de frecuencia mensual, multas, aportes especiales y cargos por nuevas inscripciones.</p>
+  <h3>4.1 Conceptos Economicos Oficiales</h3>
+  <table>
+    <tr><th>Concepto</th><th>Caja</th><th>Monto</th><th>Periodicidad</th></tr>
+    <tr><td>Cuota Frecuencia Mensual Socios</td><td>Caja 1 &mdash; Frecuencia</td><td>Bs 200.00</td><td>Mensual</td></tr>
+    <tr><td>Multa / Infraccion Disciplinaria</td><td>Caja 2 &mdash; Multas</td><td>Variable</td><td>Por evento</td></tr>
+    <tr><td>Cuota Nuevo Socio / Inscripcion</td><td>Caja 3 &mdash; Nuevos Socios</td><td>Variable</td><td>Unica vez</td></tr>
+    <tr><td>Cuota de Prestamo / Amortizacion</td><td>Caja 4 &mdash; Prestamos</td><td>Segun tabla</td><td>Mensual</td></tr>
+    <tr><td>Frecuencia Conductores Inquilinos</td><td>Caja 5 &mdash; Inquilinos</td><td>Bs 250.00</td><td>Mensual</td></tr>
+  </table>
+  <h3>4.2 Generar Cuota Mensual para Todos los Socios</h3>
+  <p>Al inicio de cada mes se genera la cuota de frecuencia para todos los socios activos. Este proceso se hace <strong>una sola vez al mes</strong>:</p>
+  <ol class="steps">
+    <li><div class="sc">Ir al modulo <strong>Cuotas</strong> desde la barra lateral izquierda.</div></li>
+    <li><div class="sc">Hacer clic en el boton rojo <strong>Generar Frecuencia Mensual</strong> en la parte superior de la pagina.</div></li>
+    <li><div class="sc">Se abrira un modal de confirmacion. Verificar el mes mostrado y el monto (Bs 200 socios / Bs 250 inquilinos). Hacer clic en <strong>Confirmar Generacion</strong>.</div></li>
+    <li><div class="sc">El sistema generara automaticamente una cuota para cada uno de los 206 socios propietarios y una por cada inquilino registrado.</div></li>
+  </ol>
+  <div class="imp"><strong>&#128680; NO ejecutar dos veces en el mismo mes</strong>Este proceso limpia las cuotas previas antes de generar las nuevas. Si ya hay pagos registrados del mes, NO ejecutar este proceso ya que las cuotas pagadas quedarian como pendientes nuevamente.</div>
+  <h3>4.3 Asignar Cuota Individual a un Socio</h3>
+  <p>Para cargar una obligacion especifica a un socio en particular (multa, aporte especial, etc.):</p>
+  <ol class="steps">
+    <li><div class="sc">En el modulo Cuotas, hacer clic en <strong>Asignar Cuota Individual</strong>.</div></li>
+    <li><div class="sc">Buscar y seleccionar al socio por nombre o numero de movil en el campo de busqueda del modal.</div></li>
+    <li><div class="sc">Seleccionar el <strong>Concepto</strong> de la lista desplegable (ej: Multa, Aporte Especial).</div></li>
+    <li><div class="sc">Ingresar el <strong>monto</strong>, el <strong>periodo</strong> y una descripcion clara del cargo. Hacer clic en <strong>Asignar</strong>.</div></li>
+  </ol>
+  <h3>4.4 Resumen del Estado de Cuotas del Mes</h3>
+  <p>La pagina de Cuotas muestra tarjetas con: total cuotas generadas, total cobrado, total pendiente, socios al dia y socios en mora. Estos indicadores se actualizan en tiempo real con cada cobro registrado.</p>
+  <h3>4.5 Gestionar Conceptos (solo Administrador)</h3>
+  <p>El administrador puede crear, editar o desactivar conceptos economicos desde el modulo Cuotas. Los conceptos desactivados no aparecen en la ventanilla de cobranzas.</p>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 4: Cuotas</div>
+</div>
+
+<!-- CAPITULO 5 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128176;</div>
+    <div>
+      <div class="chapter-num">Capitulo 5</div>
+      <div class="chapter-title">Ventanilla de Cobranzas</div>
+      <div class="chapter-desc">Registro de pagos, emision de recibos oficiales y anulacion de cobros</div>
+    </div>
+  </div>
+  <p>Este es el modulo mas usado del sistema. La cajera registra todos los pagos de los socios y emite el recibo oficial. El sistema detecta automaticamente comprobantes duplicados para evitar errores.</p>
+  <h3>5.1 Flujo del Proceso de Cobro</h3>
+  <div class="flow nb">
+    <div class="fs">1. Buscar Socio</div><div class="fa">&rarr;</div>
+    <div class="fs">2. Seleccionar Cuotas</div><div class="fa">&rarr;</div>
+    <div class="fs">3. Metodo de Pago</div><div class="fa">&rarr;</div>
+    <div class="fs">4. Confirmar Cobro</div><div class="fa">&rarr;</div>
+    <div class="fs">5. Imprimir Recibo</div>
+  </div>
+  <br/>
+  <h3>5.2 Registrar un Pago Paso a Paso</h3>
+  <ol class="steps">
+    <li><div class="sc"><strong>Buscar al socio</strong>: En el campo de busqueda, escribir el nombre, apellido o numero de movil del socio. Hacer clic en su nombre para seleccionarlo.</div></li>
+    <li><div class="sc"><strong>Ver cuotas pendientes</strong>: El sistema mostrara automaticamente todas las cuotas pendientes del socio seleccionado (frecuencia mensual, multas, cuotas de prestamo, etc.).</div></li>
+    <li><div class="sc"><strong>Seleccionar cuotas a pagar</strong>: Marcar con el checkbox las cuotas que el socio va a cancelar. Se puede seleccionar una, varias o todas a la vez.</div></li>
+    <li><div class="sc"><strong>Ingresar numero de recibo</strong>: Escribir el numero del talonario fisico (ej: <kbd>1085</kbd>). Si se deja vacio, el sistema asigna un numero automatico.</div></li>
+    <li><div class="sc"><strong>Seleccionar metodo de pago</strong>: Elegir entre Efectivo, QR / Transferencia Bancaria o Cheque. Si es transferencia, ingresar el numero de comprobante bancario del banco.</div></li>
+    <li><div class="sc"><strong>Hacer clic en "Registrar Cobro"</strong>: El sistema guardara el pago, actualizara el saldo de la caja correspondiente y marcara las cuotas como pagadas.</div></li>
+    <li><div class="sc"><strong>Imprimir el recibo</strong>: Se abrira automaticamente el recibo oficial. Usar el boton <strong>Imprimir</strong> para enviarlo a la impresora termica o laser.</div></li>
+  </ol>
+  <div class="adv"><strong>&#9888;&#65039; Recibo duplicado</strong>Si el numero de recibo ya fue usado anteriormente, el sistema mostrara la alerta COMPROBANTE DUPLICADO y bloqueara el registro. Usar el siguiente numero disponible del talonario fisico.</div>
+  <h3>5.3 Cobro Directo (Monto Libre)</h3>
+  <p>Para cobros rapidos sin seleccionar cuotas especificas (pagos en efectivo de montos redondos o abonos):</p>
+  <ol class="steps">
+    <li><div class="sc">Hacer clic en el boton verde <strong>Cobro Directo</strong> junto al buscador de socios.</div></li>
+    <li><div class="sc">Seleccionar el socio, ingresar el monto, la caja de destino, el concepto y el numero de recibo.</div></li>
+    <li><div class="sc">Confirmar. Se emite el recibo y se actualiza el saldo de la caja seleccionada.</div></li>
+  </ol>
+  <h3>5.4 Historial de Recibos Emitidos</h3>
+  <p>Hacer clic en la pestana <strong>Recibos Emitidos</strong> para ver todos los cobros registrados del dia o del mes, con filtros por fecha, socio y metodo de pago. Desde aqui se puede reimprimir cualquier recibo anterior.</p>
+  <h3>5.5 Anular una Cobranza</h3>
+  <ol class="steps">
+    <li><div class="sc">Ir a la pestana <strong>Recibos Emitidos</strong> y localizar el recibo que se desea anular.</div></li>
+    <li><div class="sc">Hacer clic en el icono de anulacion (&#128683;) en la fila del recibo.</div></li>
+    <li><div class="sc">Confirmar la anulacion. El sistema revertira el saldo de la caja y marcara las cuotas como pendientes nuevamente.</div></li>
+  </ol>
+  <div class="imp"><strong>&#128680; Solo el Administrador puede anular</strong>La anulacion de cobranzas requiere el rol de Administrador. El cajero no puede anular sus propios registros.</div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 5: Cobranzas</div>
+</div>
+
+<!-- CAPITULO 6 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128184;</div>
+    <div>
+      <div class="chapter-num">Capitulo 6</div>
+      <div class="chapter-title">Registro de Egresos y Gastos</div>
+      <div class="chapter-desc">Control de todas las salidas de dinero con comprobante oficial</div>
+    </div>
+  </div>
+  <p>Todo dinero que sale de cualquier caja del sindicato debe registrarse en este modulo. Cada egreso genera un comprobante (voucher) con numero de boleta unico.</p>
+  <h3>6.1 Registrar un Nuevo Egreso</h3>
+  <ol class="steps">
+    <li><div class="sc">Ir al modulo <strong>Egresos</strong> desde la barra lateral.</div></li>
+    <li><div class="sc">Hacer clic en <strong>+ Nuevo Egreso</strong>.</div></li>
+    <li><div class="sc">Completar el formulario:
+      <br/><br/>
+      <table>
+        <tr><th>Campo</th><th>Descripcion</th></tr>
+        <tr><td><span class="ft">Grupo / Categoria</span></td><td>Seleccionar la categoria del gasto (Planilla, Mantenimiento, Alquiler, Auxilio, etc.)</td></tr>
+        <tr><td><span class="ft">Caja de Origen</span></td><td>De que caja sale el dinero (ej: Caja 1 &mdash; Frecuencia)</td></tr>
+        <tr><td><span class="ft">Beneficiario</span></td><td>Persona o empresa que recibe el pago. Si es socio, buscarlo en la lista.</td></tr>
+        <tr><td><span class="ft">Concepto / Descripcion</span></td><td>Detalle del gasto (ej: "Pago alquiler sede Agosto 2026")</td></tr>
+        <tr><td><span class="ft">Monto</span></td><td>Importe en bolivianos</td></tr>
+        <tr><td><span class="ft">N Boleta</span></td><td>Numero del comprobante fisico. Si se deja vacio, el sistema genera uno automatico.</td></tr>
+      </table>
+    </div></li>
+    <li><div class="sc">Hacer clic en <strong>Registrar Egreso</strong>. El saldo de la caja seleccionada se reducira automaticamente.</div></li>
+    <li><div class="sc">Imprimir el voucher con el boton <strong>Imprimir Voucher</strong>.</div></li>
+  </ol>
+  <h3>6.2 Categorias de Egresos</h3>
+  <table>
+    <tr><th>Categoria</th><th>Descripcion</th></tr>
+    <tr><td>Planilla de Operadores</td><td>Sueldos de cajera, secretaria y personal de la institucion</td></tr>
+    <tr><td>Mantenimiento Antenas / Frecuencia</td><td>Pago de radio base, repetidoras y equipos de comunicacion</td></tr>
+    <tr><td>Alquiler y Servicios Basicos</td><td>Alquiler de sede, agua, luz, internet</td></tr>
+    <tr><td>Fondo de Auxilio / Solidaridad</td><td>Apoyo economico a socios por fallecimiento o enfermedad grave</td></tr>
+    <tr><td>Devolucion de Ahorro</td><td>Reintegro de ahorros a socios que se retiran del sindicato</td></tr>
+    <tr><td>Desembolso de Prestamo</td><td>Entrega de dinero por prestamo institucional aprobado</td></tr>
+    <tr><td>Gastos Administrativos</td><td>Papeleria, impresion, talonarios, sellos, tramites</td></tr>
+  </table>
+  <h3>6.3 Eliminar un Egreso</h3>
+  <p>Para corregir un egreso registrado por error (solo Administrador): ubicarlo en la tabla de egresos y hacer clic en el icono de eliminar. El monto regresara automaticamente a la caja de origen.</p>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 6: Egresos</div>
+</div>
+
+<!-- CAPITULO 7 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#127968;</div>
+    <div>
+      <div class="chapter-num">Capitulo 7</div>
+      <div class="chapter-title">Prestamos Institucionales</div>
+      <div class="chapter-desc">Creditos a socios, simulador de cuotas y seguimiento de la cartera</div>
+    </div>
+  </div>
+  <p>SISCOB gestiona prestamos a socios con calculo automatico mediante el metodo Frances (cuota fija, interes decreciente). Incluye un simulador interactivo y seguimiento completo de la cartera.</p>
+  <h3>7.1 Simulador de Prestamos</h3>
+  <ol class="steps">
+    <li><div class="sc">Ir al modulo <strong>Prestamos</strong> desde la barra lateral.</div></li>
+    <li><div class="sc">En el panel lateral del Simulador, ajustar los tres parametros:<br/>
+      &bull; <strong>Monto del Prestamo</strong> (en bolivianos)<br/>
+      &bull; <strong>Plazo en meses</strong> (ej: 12, 18, 24, 36 meses)<br/>
+      &bull; <strong>Tasa de Interes Anual</strong> (porcentaje, ej: 12%)
+    </div></li>
+    <li><div class="sc">El sistema calcula automaticamente: la cuota mensual fija, el total a pagar y el total en intereses.</div></li>
+    <li><div class="sc">Hacer clic en <strong>Ver Plan de Pagos</strong> para ver la tabla mes a mes con capital e interes de cada cuota. Se puede imprimir como documento oficial.</div></li>
+  </ol>
+  <h3>7.2 Registrar un Nuevo Prestamo</h3>
+  <ol class="steps">
+    <li><div class="sc">Hacer clic en el boton <strong>Nuevo Prestamo</strong>.</div></li>
+    <li><div class="sc">Buscar al socio beneficiario por nombre o numero de movil.</div></li>
+    <li><div class="sc">Ingresar: monto, plazo, tasa de interes y la caja de desembolso (Caja 4 &mdash; Prestamos).</div></li>
+    <li><div class="sc">Hacer clic en <strong>Registrar y Desembolsar</strong>. El sistema:<br/>
+      &bull; Registra automaticamente el egreso del desembolso en la Caja 4<br/>
+      &bull; Genera el plan de pagos (cuotas mensuales de amortizacion)<br/>
+      &bull; Crea las cuotas de prestamo en el kardex del socio
+    </div></li>
+  </ol>
+  <h3>7.3 Pago de Cuotas de Prestamo</h3>
+  <p>Las cuotas de amortizacion aparecen automaticamente en la <strong>Ventanilla de Cobranzas</strong> del socio junto a sus cuotas de frecuencia. Se cobran igual: seleccionarlas con el checkbox y confirmar el cobro.</p>
+  <h3>7.4 Seguimiento de la Cartera</h3>
+  <p>La tabla de prestamos activos muestra para cada credito: folio, nombre del socio, monto original, saldo pendiente, cuotas pagadas vs. total y estado (al dia / en mora). Hacer clic en el folio para ver el detalle completo mes a mes.</p>
+  <div class="nota"><strong>&#128203; Prestamos en Curso</strong>Para prestamos que ya existian antes de SISCOB, usar el boton <strong>Registrar Prestamo en Curso</strong>. Permite ingresar cuantas cuotas ya fueron pagadas para continuar el seguimiento desde el sistema.</div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 7: Prestamos</div>
+</div>
+
+<!-- CAPITULO 8 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#9878;&#65039;</div>
+    <div>
+      <div class="chapter-num">Capitulo 8</div>
+      <div class="chapter-title">Balance de Cajas</div>
+      <div class="chapter-desc">Estado financiero consolidado de las 5 cajas institucionales</div>
+    </div>
+  </div>
+  <p>El modulo de Balance muestra el estado financiero actual y acumulado de las 5 cajas oficiales del sindicato, con la posibilidad de filtrar por periodo y exportar el resultado.</p>
+  <h3>8.1 Las 5 Cajas Institucionales</h3>
+  <table>
+    <tr><th>Codigo</th><th>Nombre de la Caja</th><th>Que registra</th></tr>
+    <tr><td>C1</td><td>Caja de Frecuencia</td><td>Cuotas mensuales Bs 200 de los 206 socios propietarios</td></tr>
+    <tr><td>C2</td><td>Caja de Multas e Infracciones</td><td>Sanciones disciplinarias, faltas a reuniones, inasistencias</td></tr>
+    <tr><td>C3</td><td>Caja Nuevos Socios</td><td>Cuotas de inscripcion de nuevos afiliados al sindicato</td></tr>
+    <tr><td>C4</td><td>Caja Prestamos</td><td>Desembolsos y recuperacion de creditos institucionales</td></tr>
+    <tr><td>C5</td><td>Caja Frecuencia Inquilinos</td><td>Cuotas Bs 250 de conductores inquilinos y relevos</td></tr>
+  </table>
+  <h3>8.2 Interpretar las Columnas del Balance</h3>
+  <ul>
+    <li><strong>Saldo Anterior</strong>: Saldo con el que inicio el periodo (resultado del cierre del mes anterior)</li>
+    <li><strong>Ingresos</strong>: Suma de todos los cobros registrados en el periodo seleccionado</li>
+    <li><strong>Egresos</strong>: Suma de todos los gastos descontados de esta caja</li>
+    <li><strong>Saldo Actual</strong>: <em>Saldo Anterior + Ingresos &minus; Egresos</em> = dinero disponible</li>
+  </ul>
+  <h3>8.3 Filtros de Periodo</h3>
+  <p>Usar los campos <strong>Desde</strong> y <strong>Hasta</strong> para filtrar el balance por fechas especificas. El selector <strong>Caja</strong> permite ver el detalle de una sola caja o el consolidado de todas.</p>
+  <h3>8.4 Exportar el Balance</h3>
+  <ul>
+    <li><strong>Excel (.xlsx)</strong>: Hoja de calculo con el balance completo por caja</li>
+    <li><strong>CSV</strong>: Para importar en otros sistemas contables</li>
+    <li><strong>Imprimir</strong>: Balance con encabezado oficial del sindicato, firmas y sello</li>
+  </ul>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 8: Balance</div>
+</div>
+
+<!-- CAPITULO 9 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128196;</div>
+    <div>
+      <div class="chapter-num">Capitulo 9</div>
+      <div class="chapter-title">Reportes Financieros</div>
+      <div class="chapter-desc">Generacion de reportes de recaudacion, mora, deudas y prestamos</div>
+    </div>
+  </div>
+  <p>El modulo de Reportes genera documentos financieros detallados por periodo, por socio o por caja. Todos los reportes se pueden imprimir con encabezado oficial o exportar a Excel y CSV.</p>
+  <h3>9.1 Tipos de Reportes</h3>
+  <div class="cgrid nb">
+    <div class="cbox"><div class="ci">&#128200;</div><div class="cn">Reporte de Recaudados</div><div class="cd">Lista detallada de lo que pago cada socio en el periodo: concepto, monto y caja destino.</div></div>
+    <div class="cbox"><div class="ci">&#128683;</div><div class="cn">Reporte de Deudas Pendientes</div><div class="cd">Socios con cuotas sin pagar, monto adeudado y clasificacion de mora (Regular / Critica).</div></div>
+    <div class="cbox"><div class="ci">&#128201;</div><div class="cn">Reporte de Mora</div><div class="cd">Analisis de la cartera morosa: Al Dia, Mora Regular (1-3 meses) y Mora Critica (3+ meses).</div></div>
+    <div class="cbox"><div class="ci">&#127968;</div><div class="cn">Cartera de Prestamos</div><div class="cd">Estado de todos los creditos activos: saldo pendiente, cuotas al dia y en mora.</div></div>
+  </div>
+  <h3>9.2 Como Generar un Reporte</h3>
+  <ol class="steps">
+    <li><div class="sc">Ir al modulo <strong>Reportes</strong> desde la barra lateral.</div></li>
+    <li><div class="sc">Seleccionar el tipo de reporte en las pestanas superiores: <strong>Recaudados</strong> o <strong>Deudas</strong>.</div></li>
+    <li><div class="sc">Configurar los filtros disponibles:<br/>
+      &bull; <strong>Fuente de datos</strong>: "Datos Reales" (sistema actual) o "Datos Historicos" (anteriores a SISCOB)<br/>
+      &bull; <strong>Periodo</strong>: año, mes o rango personalizado de fechas<br/>
+      &bull; <strong>Caja</strong>: todas las cajas o una especifica<br/>
+      &bull; <strong>Estado de mora</strong>: Todos, Solo en mora, Solo al dia
+    </div></li>
+    <li><div class="sc">Hacer clic en <strong>Generar Reporte</strong>. La tabla se actualiza con los datos filtrados.</div></li>
+    <li><div class="sc">Exportar el resultado: <kbd>Imprimir PDF</kbd> &bull; <kbd>Excel (.xlsx)</kbd> &bull; <kbd>CSV</kbd></div></li>
+  </ol>
+  <h3>9.3 Filtros Rapidos de Fecha</h3>
+  <table>
+    <tr><th>Boton</th><th>Rango cubierto</th></tr>
+    <tr><td><kbd>Este Mes</kbd></td><td>Del dia 1 al dia actual del mes en curso</td></tr>
+    <tr><td><kbd>Ultimo Mes</kbd></td><td>Mes calendario anterior completo</td></tr>
+    <tr><td><kbd>Este Año</kbd></td><td>Del 1 de enero al dia actual del año</td></tr>
+    <tr><td><kbd>Personalizado</kbd></td><td>Ingresar manualmente las fechas Desde y Hasta</td></tr>
+  </table>
+  <div class="tip"><strong>&#128161; Reporte con logo y firma oficial</strong>Al imprimir, el reporte incluye automaticamente: nombre del sindicato, logo, periodo del reporte y el nombre del operador que lo genero. Ideal para presentar ante el directorio.</div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 9: Reportes</div>
+</div>
+
+<!-- CAPITULO 10 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#9989;</div>
+    <div>
+      <div class="chapter-num">Capitulo 10</div>
+      <div class="chapter-title">Conciliacion de Datos</div>
+      <div class="chapter-desc">Verificacion e importacion de datos externos contra el sistema</div>
+    </div>
+  </div>
+  <p>La Conciliacion permite comparar los datos de SISCOB contra reportes externos (talonario fisico, sistema anterior o planilla Excel) para detectar y corregir diferencias.</p>
+  <h3>10.1 Cargar Reporte Oficial de Agosto (1 clic)</h3>
+  <p>SISCOB incluye los datos reales de recaudacion de Agosto 2026 para Caja 1 y Caja 5:</p>
+  <ol class="steps">
+    <li><div class="sc">Ir al modulo <strong>Conciliacion</strong>.</div></li>
+    <li><div class="sc">En la seccion "Carga Rapida Oficial", hacer clic en <strong>Cargar Caja 1</strong> o <strong>Cargar Caja 5</strong>.</div></li>
+    <li><div class="sc">Los datos se procesaran y mostraran en la tabla con el estado de cada socio: PAGADO, PENDIENTE o SIN DATOS.</div></li>
+  </ol>
+  <h3>10.2 Importar un Archivo Excel Externo</h3>
+  <ol class="steps">
+    <li><div class="sc">Ir a la pestana <strong>Importar Archivo</strong>.</div></li>
+    <li><div class="sc">Hacer clic en <strong>Seleccionar Archivo</strong> y elegir el archivo .xlsx o .csv del reporte externo.</div></li>
+    <li><div class="sc">El sistema mostrara una vista previa. Los registros en rojo tienen diferencias o no coinciden con el padron.</div></li>
+    <li><div class="sc">Revisar y corregir los registros marcados en rojo. Hacer clic en <strong>Aplicar Conciliacion</strong> para registrar los pagos verificados.</div></li>
+  </ol>
+  <h3>10.3 Registro Manual Asistido</h3>
+  <p>Para registrar pagos individuales que no estan en ningun archivo: ir a la pestana <strong>Registro Manual</strong>, ingresar el numero de movil del socio, el concepto y el monto. El sistema busca automaticamente al socio en el padron.</p>
+  <h3>10.4 Historial de Lotes Importados</h3>
+  <p>La pestana <strong>Historial</strong> muestra todos los lotes de conciliacion procesados anteriormente, con la fecha, el archivo origen, el numero de registros y el estado (CONCILIADO / PENDIENTE).</p>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 10: Conciliacion</div>
+</div>
+
+<!-- CAPITULO 11 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128274;</div>
+    <div>
+      <div class="chapter-num">Capitulo 11</div>
+      <div class="chapter-title">Cierre Contable del Mes</div>
+      <div class="chapter-desc">Puesta a cero del periodo: conserva socios, reinicia cuentas y cuotas</div>
+    </div>
+  </div>
+  <p>El Cierre Contable se realiza al finalizar cada mes. Limpia todos los registros financieros del periodo (cobros, egresos, cuotas) y prepara el sistema para el siguiente mes. <strong>El padron de socios y la cartera de prestamos no se eliminan.</strong></p>
+  <div class="imp"><strong>&#128680; Accion IRREVERSIBLE</strong>El cierre contable no se puede deshacer. Antes de ejecutarlo, generar TODOS los reportes del mes y realizar un respaldo completo del sistema.</div>
+  <h3>11.1 Procedimiento de Cierre Mensual</h3>
+  <ol class="steps">
+    <li><div class="sc"><strong>Imprimir todos los reportes del mes</strong>: Balance de cajas, reporte de recaudados, reporte de deudas, cartera de prestamos. Guardar como PDF y tambien en papel.</div></li>
+    <li><div class="sc"><strong>Exportar respaldo del sistema</strong>: En el encabezado superior, hacer clic en el icono de nube y seleccionar <strong>Exportar Respaldo</strong>. Guardar el archivo JSON en USB o Google Drive.</div></li>
+    <li><div class="sc"><strong>Abrir el Cierre Contable</strong>: Hacer clic en el icono de cierre en el encabezado superior del sistema (solo visible para el Administrador). Se abrira el modal de "Puesta a Cero Contable".</div></li>
+    <li><div class="sc"><strong>Ingresar el saldo de apertura de cada caja</strong>: El sistema muestra las 5 cajas con sus saldos actuales. Ingresar el monto que se trasladara como "Saldo Anterior" al proximo mes. Normalmente es el mismo saldo actual de cada caja.</div></li>
+    <li><div class="sc"><strong>Confirmar el cierre</strong>: Hacer clic en <strong>Confirmar Puesta a Cero</strong>. El sistema ejecutara automaticamente:<br/>
+      &bull; Limpieza de todos los recibos e egresos del periodo cerrado<br/>
+      &bull; Reinicio de las 5 cajas con los saldos de apertura ingresados<br/>
+      &bull; Generacion automatica de las cuotas de frecuencia del nuevo mes<br/>
+      &bull; Conservacion intacta del padron de socios y la cartera de prestamos activos
+    </div></li>
+  </ol>
+  <div class="nota"><strong>&#128203; Despues del Cierre</strong>El sistema queda listo para operar el nuevo mes. Las 206 cuotas de frecuencia ya estaran generadas y la ventanilla podra iniciar cobros inmediatamente.</div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 11: Cierre Contable</div>
+</div>
+
+<!-- CAPITULO 12 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128100;</div>
+    <div>
+      <div class="chapter-num">Capitulo 12</div>
+      <div class="chapter-title">Usuarios y Roles</div>
+      <div class="chapter-desc">Administracion de cuentas de operadores y control de acceso por rol</div>
+    </div>
+  </div>
+  <p>Solo el Administrador puede gestionar los usuarios del sistema. Este modulo controla quien puede acceder y que puede hacer cada operador.</p>
+  <h3>12.1 Crear un Nuevo Usuario</h3>
+  <ol class="steps">
+    <li><div class="sc">Ir al modulo <strong>Usuarios y Roles</strong> desde la barra lateral (solo visible para Administrador).</div></li>
+    <li><div class="sc">Hacer clic en <strong>+ Nuevo Usuario</strong>.</div></li>
+    <li><div class="sc">Completar los campos: nombre de usuario (login), nombre completo, contrasena, email, celular y el rol asignado.</div></li>
+    <li><div class="sc">Hacer clic en <strong>Crear Usuario</strong>. El nuevo operador podra iniciar sesion inmediatamente con las credenciales creadas.</div></li>
+  </ol>
+  <h3>12.2 Roles del Sistema</h3>
+  <table>
+    <tr><th>Rol</th><th>Descripcion</th><th>Que puede hacer</th></tr>
+    <tr><td><span class="rb ra">Administrador</span></td><td>Control total del sistema</td><td>Todos los modulos + configuracion + usuarios + cierre contable + anulaciones</td></tr>
+    <tr><td><span class="rb rc">Cajero(a)</span></td><td>Operador de ventanilla</td><td>Cobranzas, egresos, consulta de socios y deudas. Sin configuracion ni usuarios.</td></tr>
+    <tr><td><span class="rb rh">Hacienda</span></td><td>Secretaria de hacienda</td><td>Balance, reportes, conciliacion. Solo lectura en cobranzas y egresos.</td></tr>
+  </table>
+  <h3>12.3 Cambiar la Contrasena de un Usuario</h3>
+  <ol class="steps">
+    <li><div class="sc">En la tabla de usuarios, hacer clic en el icono de editar (lapiz) del usuario correspondiente.</div></li>
+    <li><div class="sc">Ingresar la nueva contrasena en el campo "Contrasena".</div></li>
+    <li><div class="sc">Hacer clic en <strong>Guardar Cambios</strong>. El usuario debera usar la nueva contrasena en su proximo inicio de sesion.</div></li>
+  </ol>
+  <h3>12.4 Suspender / Reactivar un Usuario</h3>
+  <p>En el modal de edicion del usuario, cambiar el campo "Estado" de <strong>ACTIVO</strong> a <strong>INACTIVO</strong>. El usuario no podra iniciar sesion hasta que sea reactivado por el administrador.</p>
+  <div class="adv"><strong>&#9888;&#65039; Contrasenas por defecto</strong>Las contrasenas predeterminadas son <kbd>123</kbd> para todos los usuarios. Se recomienda cambiarlas antes de entregar el sistema al personal operativo.</div>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 12: Usuarios y Roles</div>
+</div>
+
+<!-- CAPITULO 13 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#128190;</div>
+    <div>
+      <div class="chapter-num">Capitulo 13</div>
+      <div class="chapter-title">Respaldo y Restauracion de Datos</div>
+      <div class="chapter-desc">Como proteger y recuperar la informacion del sistema</div>
+    </div>
+  </div>
+  <p>Es fundamental realizar respaldos periodicos para proteger los datos del sindicato contra perdidas accidentales, fallas del computador o errores del sistema.</p>
+  <h3>13.1 Exportar un Respaldo (Backup)</h3>
+  <ol class="steps">
+    <li><div class="sc">En el encabezado superior del sistema, hacer clic en el icono de la nube con flecha hacia abajo <strong>(Exportar Respaldo)</strong>.</div></li>
+    <li><div class="sc">El navegador descargara automaticamente un archivo con nombre: <strong>SISCOB_BACKUP_15ABRIL_[fecha y hora].json</strong></div></li>
+    <li><div class="sc">Guardar este archivo en al menos dos lugares seguros: una memoria USB y Google Drive (o Dropbox).</div></li>
+  </ol>
+  <div class="adv"><strong>&#9888;&#65039; Frecuencia recomendada de respaldo</strong>Realizar un respaldo al menos una vez a la semana durante las operaciones normales. Hacer uno OBLIGATORIAMENTE antes de cada Cierre Contable mensual y antes de cualquier cambio importante en la configuracion.</div>
+  <h3>13.2 Restaurar desde un Respaldo</h3>
+  <ol class="steps">
+    <li><div class="sc">En el encabezado superior, hacer clic en el icono de nube con flecha hacia arriba <strong>(Importar Respaldo)</strong>.</div></li>
+    <li><div class="sc">Seleccionar el archivo .json del respaldo previamente exportado.</div></li>
+    <li><div class="sc">Confirmar la importacion en el dialogo de confirmacion. Todos los datos del sistema se restauraran al estado guardado en el respaldo.</div></li>
+  </ol>
+  <div class="imp"><strong>&#128680; Atencion: no restaurar sobre datos correctos</strong>Al importar un respaldo se reemplazaran TODOS los datos actuales. Solo restaurar si ocurrio una perdida real de datos o un error grave. No restaurar un respaldo antiguo sobre datos actuales correctos.</div>
+  <h3>13.3 Respaldo Automatico en la Nube</h3>
+  <p>Cuando el sistema esta conectado a internet, los datos tambien se sincronizan automaticamente con la base de datos en la nube (Supabase/Railway). Esto proporciona una capa adicional de proteccion contra perdidas locales. Verificar el estado de conexion en el indicador verde/rojo del encabezado superior.</p>
+  <div class="pf">SISCOB &mdash; Manual de Usuario v1.0 &bull; Cap. 13: Respaldo</div>
+</div>
+
+<!-- CAPITULO 14 -->
+<div class="chapter">
+  <div class="chapter-header">
+    <div class="chapter-icon">&#10067;</div>
+    <div>
+      <div class="chapter-num">Capitulo 14</div>
+      <div class="chapter-title">Preguntas Frecuentes (FAQ)</div>
+      <div class="chapter-desc">Soluciones rapidas a los problemas mas comunes del sistema</div>
+    </div>
+  </div>
+
+  <h3>El sistema no carga los socios &mdash; la lista aparece vacia</h3>
+  <p><strong>Solucion:</strong> Verificar la conexion a internet. Recargar la pagina presionando <kbd>F5</kbd>. Si la conexion es correcta y el problema persiste, cerrar sesion, volver a entrar y esperar que sincronice. Los datos locales se cargaran como respaldo automaticamente.</p>
+  <div class="dt"></div>
+
+  <h3>Registre un pago pero el saldo de la caja no cambio</h3>
+  <p><strong>Solucion:</strong> Verificar que el pago se registro en la caja correcta. Cerrar sesion y volver a entrar, ya que el Dashboard se recalcula al cargar. Si el problema persiste, revisar la conexion con el servidor en la nube.</p>
+  <div class="dt"></div>
+
+  <h3>Aparece el mensaje "COMPROBANTE DUPLICADO" al registrar un cobro</h3>
+  <p><strong>Solucion:</strong> El numero de recibo ingresado ya fue usado en un cobro anterior. Revisar el talonario fisico y usar el proximo numero disponible. Si fue un error, primero anular el recibo duplicado desde el historial de recibos (requiere Administrador).</p>
+  <div class="dt"></div>
+
+  <h3>Las cuotas generadas muestran el mes equivocado</h3>
+  <p><strong>Solucion:</strong> El mes de las cuotas se calcula automaticamente a partir de la fecha real del computador. Verificar que la fecha y hora del PC esten correctas en la configuracion de Windows. Si la fecha es correcta, el mes mostrado en las cuotas tambien sera correcto.</p>
+  <div class="dt"></div>
+
+  <h3>Olvide la contrasena del administrador</h3>
+  <p><strong>Solucion:</strong> La contrasena inicial predeterminada es <kbd>123</kbd> para el usuario <kbd>admin33</kbd>. Si fue cambiada y no se recuerda, contactar al soporte tecnico del sistema para restaurarla desde el servidor.</p>
+  <div class="dt"></div>
+
+  <h3>Puedo usar SISCOB en mi telefono celular?</h3>
+  <p><strong>Solucion:</strong> Si. SISCOB es una Progressive Web App (PWA). Desde el navegador Chrome del celular, ingresar a la direccion del sistema y tocar el boton "Agregar a pantalla de inicio". Funciona como una app nativa incluso sin conexion a internet (con datos guardados localmente).</p>
+  <div class="dt"></div>
+
+  <h3>El Balance muestra Bs 0 cuando deberia haber saldo</h3>
+  <p><strong>Solucion:</strong> Verificar que el filtro de fechas incluya el periodo donde se hicieron los registros. Por defecto el balance muestra solo el mes actual. Usar el boton <kbd>Este Año</kbd> para ver el consolidado anual completo.</p>
+  <div class="dt"></div>
+
+  <h3>Como saber si un socio tiene un prestamo activo?</h3>
+  <p><strong>Solucion:</strong> En el padron de socios, el socio con prestamo activo tiene una etiqueta de color naranja junto a su nombre. Tambien puede ir directamente al modulo <strong>Prestamos</strong> y buscar al socio en la tabla de cartera activa para ver el detalle de su credito.</p>
+  <div class="dt"></div>
+
+  <h3>Como imprimir el recibo de un pago anterior?</h3>
+  <p><strong>Solucion:</strong> Ir al modulo de <strong>Cobranzas</strong>, pestana <strong>Recibos Emitidos</strong>. Buscar el recibo por fecha, socio o numero de recibo. Hacer clic en el icono de impresora en la fila del recibo para reimprimir.</p>
+  <div class="dt"></div>
+
+  <br/>
+  <div style="background:#f0fdf4;border:2px solid #16a34a;border-radius:12px;padding:24px;text-align:center;">
+    <div style="font-size:32px;margin-bottom:10px;">&#128222;</div>
+    <strong style="font-size:13pt;color:#15803d;display:block;margin-bottom:8px;">Soporte Tecnico SISCOB</strong>
+    <p style="color:#166534;margin:0;font-size:11pt;">Para asistencia tecnica adicional, comunicarse con el administrador del sistema o con el equipo de soporte tecnico del sindicato.</p>
+    <p style="color:#166534;margin-top:10px;font-size:10pt;"><strong>SINDICATO RADIO MOVIL 15 DE ABRIL</strong> &mdash; Tarija, Bolivia</p>
+  </div>
+
+  <div class="pf" style="margin-top:40px;">
+    SISCOB &mdash; Manual de Usuario v1.0 &bull; Radio Movil 15 de Abril &bull; Septiembre 2026<br/>
+    Sistema de Cobranza de Socios &mdash; Plataforma Institucional de Gestion Economica y Cobranzas
+  </div>
+</div>
+
+</body>
+</html>

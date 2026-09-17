@@ -23,6 +23,7 @@ import {
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { INITIAL_CONCEPTOS } from '../data/mockData';
 import ConceptoModal from '../components/ConceptoModal';
+import { getCajasQrAPI, updateCajaQrAPI } from '../utils/api';
 
 const CFG_KEYS = {
   GRUPOS_INGRESO: 'siscob_cfg_grupos_ingreso',
@@ -130,6 +131,65 @@ export default function ConfigPage({
   const [categoriasCobro, setCategoriasCobro] = useState(() => loadFromStorage(CFG_KEYS.CATEGORIAS, DEFAULT_CATEGORIAS));
   const [parametros, setParametros] = useState(() => loadFromStorage(CFG_KEYS.PARAMETROS, DEFAULT_PARAMETROS));
   const [tipoCambio, setTipoCambio] = useState(() => loadFromStorage(CFG_KEYS.TIPO_CAMBIO, DEFAULT_TIPO_CAMBIO));
+
+  // ── QR de Cajas: mapa cajaId → base64 string ──
+  const [qrCajas, setQrCajas] = useState({});
+  const [qrLoading, setQrLoading] = useState({});
+  const [qrToast, setQrToast] = useState('');
+
+  // Cargar QR de cajas al montar el componente
+  useEffect(() => {
+    getCajasQrAPI().then(list => {
+      if (Array.isArray(list)) {
+        const map = {};
+        list.forEach(c => { if (c.qrImage) map[c.id] = c.qrImage; });
+        setQrCajas(map);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const CAJAS_INFO = [
+    { id: 'c1', nombre: 'Caja 1 — Frecuencia Mensual', color: 'blue' },
+    { id: 'c2', nombre: 'Caja 2 — Multas e Infracciones', color: 'red' },
+    { id: 'c3', nombre: 'Caja 3 — Nuevos Socios', color: 'green' },
+    { id: 'c4', nombre: 'Caja 4 — Cartera de Préstamos', color: 'purple' },
+    { id: 'c5', nombre: 'Caja 5 — Frecuencia Inquilinos', color: 'orange' },
+  ];
+
+  const handleQrFileChange = async (cajaId, file) => {
+    if (!file) return;
+    if (file.size > 1024 * 800) {
+      alert('La imagen es muy grande. Por favor use una imagen de menos de 800 KB.');
+      return;
+    }
+    setQrLoading(prev => ({ ...prev, [cajaId]: true }));
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result; // data:image/png;base64,...
+      const result = await updateCajaQrAPI(cajaId, base64);
+      if (result && result.success) {
+        setQrCajas(prev => ({ ...prev, [cajaId]: base64 }));
+        setQrToast('QR guardado correctamente para ' + CAJAS_INFO.find(c=>c.id===cajaId)?.nombre);
+        setTimeout(() => setQrToast(''), 3000);
+      } else {
+        alert('No se pudo guardar el QR. Verifique la conexión con el servidor.');
+      }
+      setQrLoading(prev => ({ ...prev, [cajaId]: false }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleQrDelete = async (cajaId) => {
+    if (!window.confirm('¿Eliminar el QR de esta caja?')) return;
+    setQrLoading(prev => ({ ...prev, [cajaId]: true }));
+    const result = await updateCajaQrAPI(cajaId, null);
+    if (result && result.success) {
+      setQrCajas(prev => { const n = { ...prev }; delete n[cajaId]; return n; });
+      setQrToast('QR eliminado correctamente.');
+      setTimeout(() => setQrToast(''), 3000);
+    }
+    setQrLoading(prev => ({ ...prev, [cajaId]: false }));
+  };
 
   // Conceptos de Cobro en Ventanilla
   const [localConceptos, setLocalConceptos] = useState(() => {
@@ -481,6 +541,18 @@ export default function ConfigPage({
           >
             <DollarSign className="w-4 h-4" />
             <span>Tipo de Cambio</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('qr_cajas')}
+            className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl transition cursor-pointer ${
+              activeSubTab === 'qr_cajas'
+                ? 'bg-red-700 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <span className="text-base">📱</span>
+            <span>QR de Pago por Caja</span>
           </button>
         </div>
       </div>
@@ -1544,6 +1616,111 @@ export default function ConfigPage({
         onSave={handleSaveConcepto}
         initialData={editingConcepto}
       />
+
+      {/* ================================================================= */}
+      {/* SUBVENTANA: QR DE PAGO POR CAJA                                    */}
+      {/* ================================================================= */}
+      {activeSubTab === 'qr_cajas' && (
+        <div className="space-y-4">
+          {/* Toast QR */}
+          {qrToast && (
+            <div className="fixed bottom-5 right-5 z-50 bg-emerald-700 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center space-x-3 text-xs font-bold">
+              <span>✅ {qrToast}</span>
+            </div>
+          )}
+
+          {/* Cabecera explicativa */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 shadow-xs">
+            <h3 className="text-sm font-extrabold text-blue-950 flex items-center gap-2">
+              <span className="text-xl">📱</span>
+              Configuración de QR de Pago por Caja
+            </h3>
+            <p className="text-xs text-blue-800 mt-1 leading-relaxed">
+              Suba la imagen QR de la cuenta bancaria del sindicato para cada caja. El QR puede obtenerse
+              gratuitamente desde la aplicación de su banco (opción "Mi QR" o "QR para cobros").
+              Los socios podrán escanear este QR directamente desde el <strong>Portal del Socio</strong>.
+            </p>
+            <div className="mt-2 bg-blue-100 rounded-xl px-3 py-2 text-xs text-blue-900">
+              <strong>Pasos:</strong> 1) Abra su app bancaria → "Cobrar con QR" → descargue la imagen →
+              2) Haga clic en "Subir QR" aquí → 3) El QR aparece automáticamente en el portal del socio.
+            </div>
+          </div>
+
+          {/* Grid de cajas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {CAJAS_INFO.map(caja => {
+              const tieneQr = !!qrCajas[caja.id];
+              const cargando = !!qrLoading[caja.id];
+              return (
+                <div key={caja.id} className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                  {/* Header caja */}
+                  <div className="bg-slate-800 text-white px-4 py-3">
+                    <p className="font-extrabold text-sm">{caja.nombre}</p>
+                    <p className="text-slate-400 text-xs mt-0.5">
+                      {tieneQr ? '✅ QR configurado' : '⚠️ Sin QR — los socios no podrán pagar en línea'}
+                    </p>
+                  </div>
+
+                  <div className="p-4 space-y-3">
+                    {/* Vista previa del QR o placeholder */}
+                    {tieneQr ? (
+                      <div className="text-center">
+                        <img
+                          src={qrCajas[caja.id]}
+                          alt={'QR ' + caja.nombre}
+                          className="mx-auto max-h-[180px] w-auto rounded-xl border-2 border-slate-200 shadow-sm"
+                        />
+                        <p className="text-green-700 text-xs font-semibold mt-2">QR activo y visible para los socios</p>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
+                        <p className="text-3xl mb-2">📷</p>
+                        <p className="text-slate-500 text-xs font-semibold">Sin imagen QR</p>
+                        <p className="text-slate-400 text-xs mt-1">Suba el QR de su banco para esta caja</p>
+                      </div>
+                    )}
+
+                    {/* Botones acción */}
+                    <div className="flex gap-2">
+                      <label className={`flex-1 text-center cursor-pointer py-2 rounded-xl text-xs font-bold transition ${cargando ? 'opacity-50 cursor-not-allowed' : 'bg-red-700 hover:bg-red-800 text-white'}`}>
+                        {cargando ? '⏳ Guardando...' : tieneQr ? '🔄 Cambiar QR' : '📤 Subir QR'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          className="hidden"
+                          disabled={cargando}
+                          onChange={e => handleQrFileChange(caja.id, e.target.files[0])}
+                        />
+                      </label>
+                      {tieneQr && (
+                        <button
+                          onClick={() => handleQrDelete(caja.id)}
+                          disabled={cargando}
+                          className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition disabled:opacity-50"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Enlace al portal */}
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
+            <span className="text-2xl">🌐</span>
+            <div>
+              <p className="text-sm font-extrabold text-green-900">Portal del Socio</p>
+              <p className="text-xs text-green-700 mt-0.5">
+                Los socios pueden consultar sus deudas y ver los QR de pago en:
+                <strong className="ml-1 font-mono">[URL del sistema]/portal</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
