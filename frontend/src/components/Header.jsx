@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Menu, Calendar, Printer, Settings, Download, Upload, LogOut, UserCheck, RotateCcw } from 'lucide-react';
+import { Menu, Calendar, Printer, Settings, Download, Upload, LogOut, UserCheck, RotateCcw, RefreshCw } from 'lucide-react';
 
 export default function Header({ 
   toggleSidebar, 
@@ -95,6 +95,23 @@ export default function Header({
               <span>Puesta a Cero</span>
             </button>
           )}
+
+          {/* Quick Refresh / Update Button */}
+          <button
+            onClick={() => {
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(regs => {
+                  regs.forEach(r => r.update());
+                });
+              }
+              window.location.reload();
+            }}
+            className="flex items-center space-x-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-xl font-bold transition cursor-pointer"
+            title="Recargar y comprobar nueva versión"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
+            <span className="hidden xl:inline">Actualizar</span>
+          </button>
 
           {/* Printer format switcher */}
           <div className="flex items-center space-x-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">

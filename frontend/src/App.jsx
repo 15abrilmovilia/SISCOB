@@ -149,6 +149,19 @@ export default function App() {
     saveToStorage('siscob_historial_turnos', historialTurnos);
   }, [historialTurnos]);
 
+  // Recarga automática al desplegar una nueva versión (PWA Service Worker)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+    }
+  }, []);
+
   // Sync with Supabase on mount
   useEffect(() => {
     async function syncCloud() {
