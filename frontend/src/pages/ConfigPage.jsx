@@ -18,12 +18,16 @@ import {
   ToggleRight,
   Tag,
   Edit3,
-  Info
+  Info,
+  Users,
+  Dices,
+  Sparkles
 } from 'lucide-react';
 import { loadFromStorage, saveToStorage } from '../utils/storage';
 import { INITIAL_CONCEPTOS } from '../data/mockData';
 import ConceptoModal from '../components/ConceptoModal';
 import { getCajasQrAPI, updateCajaQrAPI } from '../utils/api';
+import { DEFAULT_COMISIONES_MES } from '../utils/workflowCaja';
 
 const CFG_KEYS = {
   GRUPOS_INGRESO: 'siscob_cfg_grupos_ingreso',
@@ -113,7 +117,8 @@ export default function ConfigPage({
   currentUser,
   conceptos: propConceptos,
   setConceptos: propSetConceptos,
-  onNavigateTab
+  onNavigateTab,
+  socios = []
 }) {
   const [activeSubTab, setActiveSubTab] = useState('agrupar');
 
@@ -136,6 +141,13 @@ export default function ConfigPage({
   const [qrCajas, setQrCajas] = useState({});
   const [qrLoading, setQrLoading] = useState({});
   const [qrToast, setQrToast] = useState('');
+  // ── Comisión Revisora Mensual ──
+  const [comisionesPorMes, setComisionesPorMes] = useState(() => 
+    loadFromStorage('siscob_comision_revisora', DEFAULT_COMISIONES_MES)
+  );
+  const [mesComisionSeleccionado, setMesComisionSeleccionado] = useState('Septiembre 2026');
+  const [comisionToast, setComisionToast] = useState('');
+
 
   // Cargar QR de cajas al montar el componente
   useEffect(() => {
@@ -147,6 +159,81 @@ export default function ConfigPage({
       }
     }).catch(() => {});
   }, []);
+
+
+  const handleSorteoConfig = () => {
+    const candidatos = socios.filter(s => s.estado !== 'BAJA' && s.estado !== 'INACTIVO');
+    if (candidatos.length < 3) {
+      alert('No hay suficientes socios activos en el padrón para realizar el sorteo.');
+      return;
+    }
+    const shuffled = [...candidatos].sort(() => 0.5 - Math.random());
+    const seleccionados = shuffled.slice(0, 3);
+    const cargos = ['Presidente Comisión', 'Secretario Comisión', 'Vocal Comisión'];
+    const nuevos = seleccionados.map((s, idx) => ({
+      id: s.id,
+      nombre: (s.nombres + ' ' + s.apPaterno + (s.apMaterno ? ' ' + s.apMaterno : '')).trim().toUpperCase(),
+      nroMovil: s.nroMovil || String(s.id).padStart(3, '0'),
+      ci: s.ci || '',
+      cargo: cargos[idx],
+      metodo: 'Sorteo Aleatorio de Asamblea'
+    }));
+    const updated = { ...comisionesPorMes, [mesComisionSeleccionado]: nuevos };
+    setComisionesPorMes(updated);
+    saveToStorage('siscob_comision_revisora', updated);
+    setComisionToast('🎲 ¡Sorteo aleatorio realizado y guardado para ' + mesComisionSeleccionado + '!');
+    setTimeout(() => setComisionToast(''), 4000);
+  };
+
+  const handleUpdateMiembroConfig = (idx, field, value) => {
+    const list = comisionesPorMes[mesComisionSeleccionado] || [];
+    const updatedList = list.map((m, i) => i === idx ? { ...m, [field]: value } : m);
+    const updated = { ...comisionesPorMes, [mesComisionSeleccionado]: updatedList };
+    setComisionesPorMes(updated);
+    saveToStorage('siscob_comision_revisora', updated);
+  };
+
+  const handleSelectSocioConfig = (idx, socioIdStr) => {
+    const socio = socios.find(s => s.id === Number(socioIdStr));
+    if (!socio) return;
+    const list = comisionesPorMes[mesComisionSeleccionado] || [];
+    const updatedList = list.map((m, i) => i === idx ? {
+      ...m,
+      id: socio.id,
+      nombre: (socio.nombres + ' ' + socio.apPaterno + (socio.apMaterno ? ' ' + socio.apMaterno : '')).trim().toUpperCase(),
+      nroMovil: socio.nroMovil || String(socio.id).padStart(3, '0'),
+      ci: socio.ci || '',
+      metodo: 'Asignación Manual'
+    } : m);
+    const updated = { ...comisionesPorMes, [mesComisionSeleccionado]: updatedList };
+    setComisionesPorMes(updated);
+    saveToStorage('siscob_comision_revisora', updated);
+    setComisionToast('Socio asignado correctamente');
+    setTimeout(() => setComisionToast(''), 2500);
+  };
+
+  const handleAddMiembroConfig = () => {
+    const list = comisionesPorMes[mesComisionSeleccionado] || [];
+    const updatedList = [
+      ...list,
+      { nombre: '', nroMovil: '', cargo: 'Vocal Comisión', metodo: 'Asignación Manual' }
+    ];
+    const updated = { ...comisionesPorMes, [mesComisionSeleccionado]: updatedList };
+    setComisionesPorMes(updated);
+    saveToStorage('siscob_comision_revisora', updated);
+  };
+
+  const handleRemoveMiembroConfig = (idx) => {
+    const list = comisionesPorMes[mesComisionSeleccionado] || [];
+    if (list.length <= 1) {
+      alert('La comisión debe tener al menos 1 miembro.');
+      return;
+    }
+    const updatedList = list.filter((_, i) => i !== idx);
+    const updated = { ...comisionesPorMes, [mesComisionSeleccionado]: updatedList };
+    setComisionesPorMes(updated);
+    saveToStorage('siscob_comision_revisora', updated);
+  };
 
   const CAJAS_INFO = [
     { id: 'c1', nombre: 'Caja 1 — Frecuencia Mensual', color: 'blue' },
@@ -553,6 +640,18 @@ export default function ConfigPage({
           >
             <span className="text-base">📱</span>
             <span>QR de Pago por Caja</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('comision_revisora')}
+            className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl transition cursor-pointer ${
+              activeSubTab === 'comision_revisora'
+                ? 'bg-red-700 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Comisión Revisora</span>
           </button>
         </div>
       </div>

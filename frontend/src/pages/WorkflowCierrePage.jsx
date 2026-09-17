@@ -1,26 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, Clock, CheckCircle2, AlertTriangle,
   XCircle, Lock, Unlock, FileText, Printer,
-  FileCheck2, Send, Users, ChevronRight
+  FileCheck2, Send, Users, ChevronRight, UserCheck,
+  Dices, Plus, Trash2, Edit2, Save, Sparkles, Check
 } from 'lucide-react';
-import { ESTADOS_CIERRE, ROLES_WORKFLOW, INITIAL_CIERRES } from '../utils/workflowCaja';
+import { 
+  ESTADOS_CIERRE, 
+  ROLES_WORKFLOW, 
+  INITIAL_CIERRES, 
+  DEFAULT_COMISIONES_MES 
+} from '../utils/workflowCaja';
+import { loadFromStorage, saveToStorage } from '../utils/storage';
 
-export default function WorkflowCierrePage() {
+export default function WorkflowCierrePage({ socios = [], currentUser }) {
   const [activeRole, setActiveRole] = useState(ROLES_WORKFLOW.SECRETARIA);
   const [cierres, setCierres] = useState(INITIAL_CIERRES);
   const [selectedCierreId, setSelectedCierreId] = useState('CC-2026-09-02-T1');
   const [observacionInput, setObservacionInput] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [modalActionType, setModalActionType] = useState('');
-  const [comisionEditable, setComisionEditable] = useState(false);
-  const [comisionNombres, setComisionNombres] = useState('');
+
+  // ── Gestión Dinámica de Comisión Revisora ──
+  const [comisionesPorMes, setComisionesPorMes] = useState(() => 
+    loadFromStorage('siscob_comision_revisora', DEFAULT_COMISIONES_MES)
+  );
+  const [showComisionModal, setShowComisionModal] = useState(false);
+  const [editingMes, setEditingMes] = useState('Septiembre 2026');
+  const [tempMiembros, setTempMiembros] = useState([]);
+  const [sorteoNotif, setSorteoNotif] = useState('');
 
   const selectedCierre = cierres.find(c => c.id === selectedCierreId) || cierres[0];
+
+  // Sincronizar Comisión Revisora del Cierre con los datos guardados del mes
+  useEffect(() => {
+    const comisionMes = comisionesPorMes[selectedCierre.mesReporte];
+    if (comisionMes && comisionMes.length > 0) {
+      setCierres(prev => prev.map(c => 
+        c.id === selectedCierre.id 
+          ? { ...c, comisionRevisora: comisionMes } 
+          : c
+      ));
+    }
+  }, [comisionesPorMes, selectedCierre.mesReporte, selectedCierre.id]);
 
   const getRolLabel = (rol) => {
     switch(rol) {
       case ROLES_WORKFLOW.CAJERO: return '1. Operadora/Cajera';
+      case ROLES_WORKFLOW.ADMIN_COBRADOR: return '1.B Admin (Cobrador)';
       case ROLES_WORKFLOW.SECRETARIA: return '2. Secretaría';
       case ROLES_WORKFLOW.TESORERO: return '3. Tesorero';
       case ROLES_WORKFLOW.COMISION_REVISORA: return '4. Comisión Revisora';
@@ -30,19 +57,27 @@ export default function WorkflowCierrePage() {
 
   const getActorName = (rol) => {
     switch(rol) {
-      case ROLES_WORKFLOW.CAJERO: return selectedCierre.cajero.nombre + ' (' + selectedCierre.cajero.cargo + ')';
-      case ROLES_WORKFLOW.SECRETARIA: return selectedCierre.secretaria.nombre + ' (' + selectedCierre.secretaria.cargo + ')';
-      case ROLES_WORKFLOW.TESORERO: return selectedCierre.tesorero.nombre + ' (' + selectedCierre.tesorero.cargo + ')';
-      case ROLES_WORKFLOW.COMISION_REVISORA: return 'Comisión Revisora Mensual — ' + selectedCierre.mesReporte;
-      default: return 'Usuario';
+      case ROLES_WORKFLOW.CAJERO: 
+        return selectedCierre.cajero.nombre + ' (' + selectedCierre.cajero.cargo + ')';
+      case ROLES_WORKFLOW.ADMIN_COBRADOR: 
+        return (currentUser?.nombre || 'Ing. Carlos Mendoza') + ' (Administrador / Cobrador)';
+      case ROLES_WORKFLOW.SECRETARIA: 
+        return selectedCierre.secretaria.nombre + ' (' + selectedCierre.secretaria.cargo + ')';
+      case ROLES_WORKFLOW.TESORERO: 
+        return selectedCierre.tesorero.nombre + ' (' + selectedCierre.tesorero.cargo + ')';
+      case ROLES_WORKFLOW.COMISION_REVISORA: 
+        return 'Comisión Revisora Mensual — ' + selectedCierre.mesReporte;
+      default: 
+        return 'Usuario';
     }
   };
 
   const getIp = (rol) => {
     switch(rol) {
-      case ROLES_WORKFLOW.CAJERO: return selectedCierre.cajero.ip;
-      case ROLES_WORKFLOW.SECRETARIA: return selectedCierre.secretaria.ip;
-      case ROLES_WORKFLOW.TESORERO: return selectedCierre.tesorero.ip;
+      case ROLES_WORKFLOW.CAJERO: return selectedCierre.cajero.ip || '192.168.100.14';
+      case ROLES_WORKFLOW.ADMIN_COBRADOR: return '192.168.100.5';
+      case ROLES_WORKFLOW.SECRETARIA: return selectedCierre.secretaria.ip || '192.168.100.5';
+      case ROLES_WORKFLOW.TESORERO: return selectedCierre.tesorero.ip || '192.168.100.2';
       case ROLES_WORKFLOW.COMISION_REVISORA: return '192.168.100.20';
       default: return '192.168.100.1';
     }
@@ -64,23 +99,48 @@ export default function WorkflowCierrePage() {
     return [log, ...cierre.auditoriaLogs];
   };
 
-  // Cajera solicita cierre
+  // Solicitar cierre (tanto Cajera como Administrador Cobrador)
   const handleSolicitarCierre = () => {
-    if (activeRole !== ROLES_WORKFLOW.CAJERO) {
-      alert('Solo la Operadora/Cajera puede solicitar el cierre de turno.');
+    if (activeRole !== ROLES_WORKFLOW.CAJERO && activeRole !== ROLES_WORKFLOW.ADMIN_COBRADOR) {
+      alert('Solo el responsable de caja (Cajera o Administrador) puede solicitar el cierre de turno.');
       return;
     }
-    const logs = addLog(selectedCierre, 'SOLICITUD_CIERRE_CAJERA',
-      selectedCierre.estado, ESTADOS_CIERRE.CIERRE_SOLICITADO,
-      'Cierre de turno enviado a revisión de Secretaría. Gaveta bloqueada.');
+    const cobradorTexto = activeRole === ROLES_WORKFLOW.ADMIN_COBRADOR 
+      ? 'Administración Central (Cobrador)' 
+      : 'Operadora / Cajera';
+
+    const logs = addLog(
+      selectedCierre, 
+      'SOLICITUD_CIERRE_COBRADOR',
+      selectedCierre.estado, 
+      ESTADOS_CIERRE.CIERRE_SOLICITADO,
+      'Cierre de turno enviado a revisión de Secretaría por ' + cobradorTexto + '. Gaveta bloqueada.'
+    );
+
     setCierres(cierres.map(c => c.id === selectedCierre.id ? {
-      ...c, estado: ESTADOS_CIERRE.CIERRE_SOLICITADO,
-      bloqueadoEdicion: true, auditoriaLogs: logs
+      ...c, 
+      estado: ESTADOS_CIERRE.CIERRE_SOLICITADO,
+      bloqueadoEdicion: true, 
+      auditoriaLogs: logs
     } : c));
-    alert('Cierre enviado a Secretaría. La caja quedó bloqueada para edición.');
+
+    alert('Cierre enviado a Secretaría por ' + cobradorTexto + '. La caja quedó bloqueada para edición.');
   };
 
-  // Confirmar acción desde modal
+  // Cambiar cobrador asignado al turno (Cajera <-> Administrador)
+  const handleToggleCobradorTurno = () => {
+    const esAdminActual = selectedCierre.cajero.cargo.includes('Administrador');
+    const nuevoCajero = esAdminActual 
+      ? { id: 'cajera01', nombre: 'Daniela Alarcón', cargo: 'Operadora / Cajera', ip: '192.168.100.14' }
+      : { id: 'admin01', nombre: currentUser?.nombre || 'Ing. Carlos Mendoza', cargo: 'Administrador / Cobrador', ip: '192.168.100.5' };
+
+    setCierres(prev => prev.map(c => 
+      c.id === selectedCierre.id ? { ...c, cajero: nuevoCajero } : c
+    ));
+    alert('Cobrador del turno cambiado a: ' + nuevoCajero.nombre + ' (' + nuevoCajero.cargo + ')');
+  };
+
+  // Confirmar acción de dictamen
   const handleConfirmModal = () => {
     if (!observacionInput && modalActionType === 'rechazar') {
       alert('Debe indicar el motivo del rechazo.');
@@ -124,7 +184,109 @@ export default function WorkflowCierrePage() {
 
     setShowModal(false);
     setObservacionInput('');
-    alert('Acción registrada: ' + estadoNuevo.toUpperCase());
+    alert('Acción registrada con éxito: ' + estadoNuevo.toUpperCase());
+  };
+
+  // ── Funciones de Comisión Revisora (Asignación Manual y Sorteo) ──
+  const handleOpenComisionModal = () => {
+    const mes = selectedCierre.mesReporte || 'Septiembre 2026';
+    setEditingMes(mes);
+    const existing = comisionesPorMes[mes] || selectedCierre.comisionRevisora || [];
+    setTempMiembros(JSON.parse(JSON.stringify(existing)));
+    setSorteoNotif('');
+    setShowComisionModal(true);
+  };
+
+  // Sorteo aleatorio entre los 206 socios activos (estado === 'VIG')
+  const handleSorteoAleatorio = () => {
+    const sociosCandidatos = socios.filter(s => s.estado !== 'BAJA' && s.estado !== 'INACTIVO');
+    if (sociosCandidatos.length < 3) {
+      alert('No hay suficientes socios activos registrados para realizar el sorteo.');
+      return;
+    }
+
+    // Mezclar aleatoriamente con Fisher-Yates
+    const shuffled = [...sociosCandidatos].sort(() => 0.5 - Math.random());
+    const seleccionados = shuffled.slice(0, 3);
+
+    const cargos = ['Presidente Comisión', 'Secretario Comisión', 'Vocal Comisión'];
+    const nuevos = seleccionados.map((s, idx) => ({
+      id: s.id,
+      nombre: (s.nombres + ' ' + s.apPaterno + (s.apMaterno ? ' ' + s.apMaterno : '')).trim().toUpperCase(),
+      nroMovil: s.nroMovil || String(s.id).padStart(3, '0'),
+      ci: s.ci || '',
+      cargo: cargos[idx] || ('Miembro ' + (idx + 1)),
+      metodo: 'Sorteo Aleatorio de Asamblea'
+    }));
+
+    setTempMiembros(nuevos);
+    setSorteoNotif('🎲 ¡Sorteo realizado exitosamente entre ' + sociosCandidatos.length + ' socios activos!');
+    setTimeout(() => setSorteoNotif(''), 5000);
+  };
+
+  const handleAddMiembroManual = () => {
+    setTempMiembros(prev => [
+      ...prev,
+      {
+        nombre: '',
+        nroMovil: '',
+        cargo: 'Vocal Comisión',
+        metodo: 'Asignación Manual'
+      }
+    ]);
+  };
+
+  const handleSelectSocioForMiembro = (index, socioIdStr) => {
+    const socioId = Number(socioIdStr);
+    const s = socios.find(item => item.id === socioId);
+    if (!s) return;
+
+    setTempMiembros(prev => prev.map((m, i) => i === index ? {
+      ...m,
+      id: s.id,
+      nombre: (s.nombres + ' ' + s.apPaterno + (s.apMaterno ? ' ' + s.apMaterno : '')).trim().toUpperCase(),
+      nroMovil: s.nroMovil || String(s.id).padStart(3, '0'),
+      ci: s.ci || '',
+      metodo: 'Asignación Manual'
+    } : m));
+  };
+
+  const handleUpdateMiembroField = (index, field, value) => {
+    setTempMiembros(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m));
+  };
+
+  const handleRemoveMiembro = (index) => {
+    if (tempMiembros.length <= 1) {
+      alert('La comisión revisora debe tener al menos 1 miembro.');
+      return;
+    }
+    setTempMiembros(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveComision = () => {
+    // Validar que no haya nombres vacíos
+    if (tempMiembros.some(m => !m.nombre || !m.nombre.trim())) {
+      alert('Por favor complete el nombre de todos los miembros de la comisión.');
+      return;
+    }
+
+    const updated = {
+      ...comisionesPorMes,
+      [editingMes]: tempMiembros
+    };
+
+    setComisionesPorMes(updated);
+    saveToStorage('siscob_comision_revisora', updated);
+
+    // Actualizar también el cierre activo
+    setCierres(prev => prev.map(c => 
+      c.mesReporte === editingMes 
+        ? { ...c, comisionRevisora: tempMiembros } 
+        : c
+    ));
+
+    setShowComisionModal(false);
+    alert('✅ Comisión Revisora del mes "' + editingMes + '" guardada y aplicada al acta con éxito.');
   };
 
   // Badge de estado
@@ -141,9 +303,8 @@ export default function WorkflowCierrePage() {
     return badges[estado] || null;
   };
 
-  // Stepper: qué paso está activo
   const steps = [
-    { label: '1. Operadora/Cajera', estados: [ESTADOS_CIERRE.OPERACIONES_REGISTRADAS, ESTADOS_CIERRE.CIERRE_SOLICITADO, ESTADOS_CIERRE.REVISADO_SECRETARIA, ESTADOS_CIERRE.APROBADO_TESORERO, ESTADOS_CIERRE.CONSOLIDADO] },
+    { label: '1. Cajera / Admin', estados: [ESTADOS_CIERRE.OPERACIONES_REGISTRADAS, ESTADOS_CIERRE.CIERRE_SOLICITADO, ESTADOS_CIERRE.REVISADO_SECRETARIA, ESTADOS_CIERRE.APROBADO_TESORERO, ESTADOS_CIERRE.CONSOLIDADO] },
     { label: '2. Secretaría', estados: [ESTADOS_CIERRE.REVISADO_SECRETARIA, ESTADOS_CIERRE.APROBADO_TESORERO, ESTADOS_CIERRE.CONSOLIDADO] },
     { label: '3. Tesorero', estados: [ESTADOS_CIERRE.APROBADO_TESORERO, ESTADOS_CIERRE.CONSOLIDADO] },
     { label: '4. Comisión Revisora', estados: [ESTADOS_CIERRE.CONSOLIDADO] },
@@ -161,18 +322,23 @@ export default function WorkflowCierrePage() {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-fadeIn text-slate-800">
 
-      {/* Banner de Rol Activo */}
+      {/* Banner de Roles con selector para Administrador Cobrador */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-red-950 text-white p-4 rounded-2xl shadow-md flex flex-wrap justify-between items-center gap-3 no-print">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-red-700 text-white rounded-xl">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] font-bold text-red-300 uppercase tracking-wider block">
-              Control Oficial de Cierre — Sindicato Radio Móvil 15 de Abril
-            </span>
+            <div className="flex items-center space-x-2">
+              <span className="text-[11px] font-bold text-red-300 uppercase tracking-wider block">
+                Control Oficial de Cierre — Sindicato Radio Móvil 15 de Abril
+              </span>
+              <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                Admin igual cobra
+              </span>
+            </div>
             <h2 className="text-sm sm:text-base font-extrabold tracking-wide">
-              Rol Activo: <strong className="text-amber-300">{getActorName(activeRole)}</strong>
+              Rol Activo en Sesión: <strong className="text-amber-300">{getActorName(activeRole)}</strong>
             </h2>
           </div>
         </div>
@@ -181,13 +347,17 @@ export default function WorkflowCierrePage() {
           <span className="text-slate-400 px-2 text-[11px]">Cambiar Rol:</span>
           {[
             { rol: ROLES_WORKFLOW.CAJERO, label: '1. Cajera' },
+            { rol: ROLES_WORKFLOW.ADMIN_COBRADOR, label: '1.B Admin Cobrador' },
             { rol: ROLES_WORKFLOW.SECRETARIA, label: '2. Secretaría' },
             { rol: ROLES_WORKFLOW.TESORERO, label: '3. Tesorero' },
             { rol: ROLES_WORKFLOW.COMISION_REVISORA, label: '4. Comisión' },
           ].map(({ rol, label }) => (
-            <button key={rol}
+            <button 
+              key={rol}
               onClick={() => setActiveRole(rol)}
-              className={"px-3 py-1 rounded-lg transition cursor-pointer " + (activeRole === rol ? 'bg-red-700 text-white shadow-xs' : 'text-slate-300 hover:text-white')}>
+              className={"px-3 py-1 rounded-lg transition cursor-pointer " + 
+                (activeRole === rol ? 'bg-red-700 text-white shadow-xs' : 'text-slate-300 hover:text-white')}
+            >
               {label}
             </button>
           ))}
@@ -197,8 +367,34 @@ export default function WorkflowCierrePage() {
       {/* Grid principal */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        {/* Columna izquierda: Lista de cierres */}
+        {/* Columna izquierda: Lista de cierres y asignación */}
         <div className="lg:col-span-4 space-y-4 no-print">
+          
+          {/* Botón Destacado: Asignar Comisión Revisora */}
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl p-4 shadow-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Users className="w-5 h-5 text-amber-700" />
+                <h3 className="font-extrabold text-xs uppercase text-amber-950">
+                  Comisión Revisora ({selectedCierre.mesReporte})
+                </h3>
+              </div>
+              <span className="bg-amber-200 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {selectedCierre.comisionRevisora.length} Miembros
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-800">
+              Socios asignados cada mes por sorteo o asignación para aprobar ingresos y egresos junto al Tesorero.
+            </p>
+            <button
+              onClick={handleOpenComisionModal}
+              className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+            >
+              <Dices className="w-4 h-4" />
+              <span>Sortear / Asignar Socios del Mes</span>
+            </button>
+          </div>
+
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex justify-between items-center">
             <h3 className="font-extrabold text-sm uppercase tracking-wide text-slate-900">Cierres de Turno</h3>
             <span className="text-xs font-bold text-red-700 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">{cierres.length} Turnos</span>
@@ -217,8 +413,9 @@ export default function WorkflowCierrePage() {
                   </div>
                   {renderBadge(c.estado)}
                 </div>
-                <div className="text-[11px] text-slate-500 font-medium">
-                  Cajera: <strong className="text-slate-700">{c.cajero.nombre}</strong> • {c.fecha}
+                <div className="text-[11px] text-slate-500 font-medium flex items-center justify-between">
+                  <span>Cobrador: <strong className="text-slate-800">{c.cajero.nombre}</strong></span>
+                  <span className="text-slate-400 font-mono text-[10px]">{c.fecha}</span>
                 </div>
                 <div className="flex justify-between text-xs font-mono pt-2 border-t border-slate-100">
                   <span className="text-slate-500">Saldo Teórico:</span>
@@ -269,14 +466,35 @@ export default function WorkflowCierrePage() {
                 <h2 className="font-black text-lg text-slate-900 uppercase">
                   Acta Oficial de Arqueo y Cierre de Caja
                 </h2>
-                <p className="text-xs text-slate-500 font-mono">
-                  Expediente: <strong>{selectedCierre.id}</strong> • {selectedCierre.turno} • Período: {selectedCierre.mesReporte}
-                </p>
+                <div className="flex items-center space-x-2 text-xs text-slate-500 font-mono mt-1">
+                  <span>Expediente: <strong>{selectedCierre.id}</strong></span>
+                  <span>•</span>
+                  <span>{selectedCierre.turno}</span>
+                  <span>•</span>
+                  <span className="text-red-700 font-bold">Mes: {selectedCierre.mesReporte}</span>
+                </div>
               </div>
               <div className="text-right">
                 {renderBadge(selectedCierre.estado)}
                 <div className="text-[10px] font-mono text-slate-400 mt-1">Fecha: {selectedCierre.fecha}</div>
               </div>
+            </div>
+
+            {/* Selector de Cobrador del Turno (Cajera o Administrador) */}
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between text-xs gap-2 no-print">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-slate-500 uppercase text-[10px]">Cobrador del Turno:</span>
+                <strong className="text-slate-900">{selectedCierre.cajero.nombre}</strong>
+                <span className="bg-slate-200 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded">
+                  {selectedCierre.cajero.cargo}
+                </span>
+              </div>
+              <button
+                onClick={handleToggleCobradorTurno}
+                className="text-[11px] font-bold text-red-700 hover:text-red-900 underline cursor-pointer"
+              >
+                🔄 Cambiar cobrador (Cajera ↔ Administrador)
+              </button>
             </div>
 
             {/* Resumen financiero */}
@@ -320,7 +538,7 @@ export default function WorkflowCierrePage() {
             {/* Observaciones por nivel */}
             <div className="space-y-2 text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="font-bold text-[10px] text-slate-500 uppercase block">1. Observaciones Operadora/Cajera:</span>
+                <span className="font-bold text-[10px] text-slate-500 uppercase block">1. Observaciones Cobrador(a) (Cajera / Admin):</span>
                 <p className="text-slate-800 italic mt-1">"{selectedCierre.observacionesCajero}"</p>
               </div>
               {selectedCierre.observacionesSecretaria && (
@@ -343,51 +561,87 @@ export default function WorkflowCierrePage() {
               )}
             </div>
 
-            {/* Comisión Revisora — Miembros */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="flex items-center gap-2 font-extrabold text-xs text-amber-900 uppercase">
-                  <Users className="w-4 h-4"/>Comisión Revisora — {selectedCierre.mesReporte}
-                  <span className="font-normal text-amber-700 text-[10px] normal-case">(Asignados por sorteo/rotación mensual)</span>
+            {/* Comisión Revisora — Miembros Asignados */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <span className="flex items-center gap-2 font-extrabold text-xs text-amber-950 uppercase">
+                  <Users className="w-4 h-4 text-amber-700"/>
+                  Comisión Revisora Asignada — {selectedCierre.mesReporte}
                 </span>
+                <button
+                  onClick={handleOpenComisionModal}
+                  className="no-print text-[11px] bg-amber-600 hover:bg-amber-700 text-white font-bold px-2.5 py-1 rounded-lg transition shadow-xs cursor-pointer flex items-center space-x-1"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  <span>Modificar Miembros</span>
+                </button>
               </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {selectedCierre.comisionRevisora.map((m, i) => (
-                  <div key={i} className="bg-white border border-amber-200 rounded-lg px-3 py-2 text-xs">
-                    <strong className="text-slate-800 block">{m.nombre}</strong>
-                    <span className="text-slate-500">Móvil #{m.nroMovil} — {m.cargo}</span>
+                  <div key={i} className="bg-white border border-amber-200 rounded-lg p-2.5 text-xs space-y-0.5">
+                    <div className="flex justify-between items-start">
+                      <strong className="text-slate-900 block font-bold text-[11px]">{m.nombre}</strong>
+                      <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">
+                        Móvil #{m.nroMovil}
+                      </span>
+                    </div>
+                    <p className="text-amber-900 font-semibold text-[10px]">{m.cargo}</p>
+                    <p className="text-slate-400 text-[9px] font-mono">{m.metodo || 'Asignado en asamblea'}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Firmas del acta */}
-            <div className="pt-6 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-[10px]">
-              <div className="border-t border-slate-400 pt-1">
-                <strong className="block text-slate-800">{selectedCierre.cajero.nombre}</strong>
-                <span className="text-slate-500 uppercase block">{selectedCierre.cajero.cargo}</span>
-                <span className="font-mono text-[9px] text-slate-400">IP: {selectedCierre.cajero.ip}</span>
+            {/* Firmas Oficiales: Cobrador, Secretaría, Tesorero y los 3 Miembros de la Comisión */}
+            <div className="pt-6 space-y-4">
+              <p className="text-center font-bold text-slate-400 text-[10px] uppercase tracking-wider">
+                Firmas y Rúbricas Oficiales de Conformidad
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-center text-[10px]">
+                {/* 1. Cobrador */}
+                <div className="border-t border-slate-400 pt-1">
+                  <strong className="block text-slate-800">{selectedCierre.cajero.nombre}</strong>
+                  <span className="text-slate-500 uppercase block">{selectedCierre.cajero.cargo}</span>
+                  <span className="font-mono text-[9px] text-slate-400">IP: {selectedCierre.cajero.ip}</span>
+                </div>
+
+                {/* 2. Secretaría */}
+                <div className="border-t border-slate-400 pt-1">
+                  <strong className="block text-slate-800">{selectedCierre.secretaria.nombre}</strong>
+                  <span className="text-slate-500 uppercase block">{selectedCierre.secretaria.cargo}</span>
+                  <span className="font-mono text-[9px] text-slate-400">
+                    {[ESTADOS_CIERRE.REVISADO_SECRETARIA, ESTADOS_CIERRE.APROBADO_TESORERO, ESTADOS_CIERRE.CONSOLIDADO].includes(selectedCierre.estado) ? 'Revisado ✓' : 'Pendiente Revisión'}
+                  </span>
+                </div>
+
+                {/* 3. Tesorero */}
+                <div className="border-t border-slate-400 pt-1">
+                  <strong className="block text-slate-800">{selectedCierre.tesorero.nombre}</strong>
+                  <span className="text-slate-500 uppercase block">{selectedCierre.tesorero.cargo}</span>
+                  <span className="font-mono text-[9px] text-slate-400">
+                    {[ESTADOS_CIERRE.APROBADO_TESORERO, ESTADOS_CIERRE.CONSOLIDADO].includes(selectedCierre.estado) ? 'Aprobado ✓' : 'Pendiente Aprobación'}
+                  </span>
+                </div>
               </div>
-              <div className="border-t border-slate-400 pt-1">
-                <strong className="block text-slate-800">{selectedCierre.secretaria.nombre}</strong>
-                <span className="text-slate-500 uppercase block">{selectedCierre.secretaria.cargo}</span>
-                <span className="font-mono text-[9px] text-slate-400">
-                  {[ESTADOS_CIERRE.REVISADO_SECRETARIA, ESTADOS_CIERRE.APROBADO_TESORERO, ESTADOS_CIERRE.CONSOLIDADO].includes(selectedCierre.estado) ? 'Revisado ✓' : 'Pendiente Revisión'}
-                </span>
-              </div>
-              <div className="border-t border-slate-400 pt-1">
-                <strong className="block text-slate-800">{selectedCierre.tesorero.nombre}</strong>
-                <span className="text-slate-500 uppercase block">{selectedCierre.tesorero.cargo}</span>
-                <span className="font-mono text-[9px] text-slate-400">
-                  {[ESTADOS_CIERRE.APROBADO_TESORERO, ESTADOS_CIERRE.CONSOLIDADO].includes(selectedCierre.estado) ? 'Aprobado ✓' : 'Pendiente Aprobación'}
-                </span>
-              </div>
-              <div className="border-t border-slate-400 pt-1">
-                <strong className="block text-slate-800">Comisión Revisora</strong>
-                <span className="text-slate-500 uppercase block">{selectedCierre.mesReporte}</span>
-                <span className="font-mono text-[9px] text-slate-400">
-                  {selectedCierre.estado === ESTADOS_CIERRE.CONSOLIDADO ? 'Visto Bueno ✓' : 'Pendiente V°B°'}
-                </span>
+
+              {/* Firmas individuales de la Comisión Revisora */}
+              <div className="pt-3 border-t border-dashed border-slate-200">
+                <p className="text-left font-bold text-amber-900 text-[10px] uppercase mb-3">
+                  Miembros de la Comisión Revisora — {selectedCierre.mesReporte}:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center text-[10px]">
+                  {selectedCierre.comisionRevisora.map((m, idx) => (
+                    <div key={idx} className="border-t border-amber-400 pt-1">
+                      <strong className="block text-slate-800">{m.nombre}</strong>
+                      <span className="text-amber-800 font-semibold uppercase block">Móvil #{m.nroMovil} • {m.cargo}</span>
+                      <span className="font-mono text-[9px] text-slate-400">
+                        {selectedCierre.estado === ESTADOS_CIERRE.CONSOLIDADO ? 'V°B° Conforme ✓' : 'Pendiente V°B°'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -405,10 +659,11 @@ export default function WorkflowCierrePage() {
                 <Printer className="w-3.5 h-3.5"/><span>Imprimir Acta</span>
               </button>
 
-              {/* Cajera: solicitar cierre */}
-              {activeRole === ROLES_WORKFLOW.CAJERO && selectedCierre.estado === ESTADOS_CIERRE.OPERACIONES_REGISTRADAS && (
+              {/* Cajera o Admin Cobrador: solicitar cierre */}
+              {(activeRole === ROLES_WORKFLOW.CAJERO || activeRole === ROLES_WORKFLOW.ADMIN_COBRADOR) && 
+               selectedCierre.estado === ESTADOS_CIERRE.OPERACIONES_REGISTRADAS && (
                 <button onClick={handleSolicitarCierre}
-                  className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer">
+                  className="flex items-center space-x-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shadow-xs">
                   <Send className="w-3.5 h-3.5"/><span>Solicitar Cierre y Bloquear Caja</span>
                 </button>
               )}
@@ -417,11 +672,11 @@ export default function WorkflowCierrePage() {
               {activeRole === ROLES_WORKFLOW.SECRETARIA && selectedCierre.estado === ESTADOS_CIERRE.CIERRE_SOLICITADO && (
                 <>
                   <button onClick={() => { setModalActionType('rechazar'); setShowModal(true); }}
-                    className="flex items-center space-x-1.5 bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer">
+                    className="flex items-center space-x-1.5 bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs">
                     <XCircle className="w-3.5 h-3.5"/><span>Observar / Devolver</span>
                   </button>
                   <button onClick={() => { setModalActionType('aprobar_secretaria'); setShowModal(true); }}
-                    className="flex items-center space-x-1.5 bg-cyan-700 hover:bg-cyan-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer">
+                    className="flex items-center space-x-1.5 bg-cyan-700 hover:bg-cyan-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shadow-xs">
                     <CheckCircle2 className="w-3.5 h-3.5"/><span>Aprobar — Pasar a Tesorero</span>
                   </button>
                 </>
@@ -431,11 +686,11 @@ export default function WorkflowCierrePage() {
               {activeRole === ROLES_WORKFLOW.TESORERO && selectedCierre.estado === ESTADOS_CIERRE.REVISADO_SECRETARIA && (
                 <>
                   <button onClick={() => { setModalActionType('rechazar'); setShowModal(true); }}
-                    className="flex items-center space-x-1.5 bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer">
+                    className="flex items-center space-x-1.5 bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs">
                     <XCircle className="w-3.5 h-3.5"/><span>Observar / Rechazar</span>
                   </button>
                   <button onClick={() => { setModalActionType('aprobar_tesorero'); setShowModal(true); }}
-                    className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer">
+                    className="flex items-center space-x-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shadow-xs">
                     <CheckCircle2 className="w-3.5 h-3.5"/><span>Aprobar — Pasar a Comisión</span>
                   </button>
                 </>
@@ -445,11 +700,11 @@ export default function WorkflowCierrePage() {
               {activeRole === ROLES_WORKFLOW.COMISION_REVISORA && selectedCierre.estado === ESTADOS_CIERRE.APROBADO_TESORERO && (
                 <>
                   <button onClick={() => { setModalActionType('rechazar'); setShowModal(true); }}
-                    className="flex items-center space-x-1.5 bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer">
+                    className="flex items-center space-x-1.5 bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs">
                     <XCircle className="w-3.5 h-3.5"/><span>Objetar / Devolver</span>
                   </button>
                   <button onClick={() => { setModalActionType('visto_bueno_comision'); setShowModal(true); }}
-                    className="flex items-center space-x-1.5 bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer">
+                    className="flex items-center space-x-1.5 bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shadow-xs">
                     <FileCheck2 className="w-3.5 h-3.5"/><span>Otorgar Visto Bueno Final</span>
                   </button>
                 </>
@@ -507,6 +762,189 @@ export default function WorkflowCierrePage() {
         </div>
       </div>
 
+      {/* ========================================================================= */}
+      {/* MODAL: ASIGNAR / SORTEAR COMISIÓN REVISORA DEL MES                        */}
+      {/* ========================================================================= */}
+      {showComisionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 text-xs">
+            {/* Header Modal */}
+            <div className="bg-gradient-to-r from-amber-700 to-amber-900 text-white p-5 flex justify-between items-center">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-amber-600 rounded-xl">
+                  <Users className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm uppercase tracking-wide">
+                    Asignación de Comisión Revisora Mensual
+                  </h3>
+                  <p className="text-amber-200 text-xs">
+                    Sindicato Radio Móvil 15 de Abril • Período: <strong>{editingMes}</strong>
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowComisionModal(false)} className="text-white/80 hover:text-white text-lg font-bold">✕</button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* Notificación de Sorteo */}
+              {sorteoNotif && (
+                <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 font-bold text-xs flex items-center space-x-2 animate-bounce">
+                  <span>{sorteoNotif}</span>
+                </div>
+              )}
+
+              {/* Botón de Sorteo Automático */}
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-extrabold text-amber-950 text-xs flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    Sorteo Aleatorio de Asamblea (Rotación Mensual)
+                  </h4>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    Elige al azar 3 socios activos del padrón para conformar la comisión del mes.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSorteoAleatorio}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-xs transition shadow-xs flex items-center space-x-1.5 cursor-pointer active:scale-95"
+                >
+                  <Dices className="w-4 h-4" />
+                  <span>Realizar Sorteo Aleatorio</span>
+                </button>
+              </div>
+
+              {/* Selector de Mes */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1 uppercase text-[10px]">
+                  Mes del Período a Asignar:
+                </label>
+                <input
+                  type="text"
+                  value={editingMes}
+                  onChange={(e) => setEditingMes(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
+                  placeholder="ej. Septiembre 2026"
+                />
+              </div>
+
+              {/* Lista de Miembros */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="block font-bold text-slate-700 uppercase text-[10px]">
+                    Miembros de la Comisión ({tempMiembros.length}):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddMiembroManual}
+                    className="text-xs font-bold text-amber-700 hover:text-amber-900 flex items-center space-x-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar Miembro</span>
+                  </button>
+                </div>
+
+                {tempMiembros.map((m, idx) => (
+                  <div key={idx} className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-extrabold text-slate-800 text-[11px]">
+                        Miembro #{idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMiembro(idx)}
+                        className="text-slate-400 hover:text-rose-700 transition"
+                        title="Quitar miembro"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                      {/* Dropdown elegir del padrón de socios */}
+                      <div className="sm:col-span-5">
+                        <label className="block text-[10px] text-slate-500 font-bold mb-0.5">
+                          Seleccionar del Padrón de Socios:
+                        </label>
+                        <select
+                          value={m.id || ''}
+                          onChange={(e) => handleSelectSocioForMiembro(idx, e.target.value)}
+                          className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] font-bold text-slate-800"
+                        >
+                          <option value="">-- Buscar socio por Móvil/Nombre --</option>
+                          {socios.map(s => (
+                            <option key={s.id} value={s.id}>
+                              Móv #{s.nroMovil || s.id} - {s.nombres} {s.apPaterno} ({s.categoria})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Nombre completo */}
+                      <div className="sm:col-span-4">
+                        <label className="block text-[10px] text-slate-500 font-bold mb-0.5">
+                          Nombre Completo:
+                        </label>
+                        <input
+                          type="text"
+                          value={m.nombre}
+                          onChange={(e) => handleUpdateMiembroField(idx, 'nombre', e.target.value)}
+                          placeholder="Nombre y Apellidos"
+                          className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] font-bold text-slate-800"
+                        />
+                      </div>
+
+                      {/* Cargo */}
+                      <div className="sm:col-span-3">
+                        <label className="block text-[10px] text-slate-500 font-bold mb-0.5">
+                          Cargo / Rol:
+                        </label>
+                        <select
+                          value={m.cargo}
+                          onChange={(e) => handleUpdateMiembroField(idx, 'cargo', e.target.value)}
+                          className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] font-bold text-amber-900"
+                        >
+                          <option value="Presidente Comisión">Presidente</option>
+                          <option value="Secretario Comisión">Secretario</option>
+                          <option value="Vocal Comisión">Vocal 1</option>
+                          <option value="Vocal 2 Comisión">Vocal 2</option>
+                          <option value="Miembro Revisor">Miembro Revisor</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1">
+                      <span>Nº Móvil: <strong>{m.nroMovil || 'S/N'}</strong></span>
+                      <span className="italic">{m.metodo || 'Asignación Manual'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Botones de acción modal */}
+              <div className="pt-3 flex justify-end space-x-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowComisionModal(false)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveComision}
+                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold transition shadow-xs flex items-center space-x-2 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Guardar Comisión Revisora</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de dictamen */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
@@ -526,10 +964,10 @@ export default function WorkflowCierrePage() {
             </div>
             <div className="p-5 space-y-3">
               <p className="text-slate-600">
-                {modalActionType === 'rechazar' && 'Indique el motivo del rechazo. La cajera podrá corregir y reenviar.'}
+                {modalActionType === 'rechazar' && 'Indique el motivo del rechazo. La cajera o cobrador podrá corregir y reenviar.'}
                 {modalActionType === 'aprobar_secretaria' && 'Certifica que revisó las operaciones del turno y están conformes.'}
                 {modalActionType === 'aprobar_tesorero' && 'Como Tesorero del Sindicato, aprueba este cierre de caja y lo envía a la Comisión Revisora.'}
-                {modalActionType === 'visto_bueno_comision' && 'La Comisión Revisora otorga el visto bueno final. Este acta quedará consolidada en los balances del sindicato.'}
+                {modalActionType === 'visto_bueno_comision' && 'La Comisión Revisora del mes (' + selectedCierre.comisionRevisora.map(m=>m.nombre).join(', ') + ') otorga el visto bueno final. Este acta quedará consolidada en los balances del sindicato.'}
               </p>
               <div>
                 <label className="block font-bold text-slate-700 mb-1">

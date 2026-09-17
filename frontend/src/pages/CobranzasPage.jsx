@@ -17,7 +17,8 @@ import {
   Calendar,
   Edit3,
   PlusCircle,
-  Tag
+  Tag,
+  User
 } from 'lucide-react';
 import ReceiptModal from '../components/ReceiptModal';
 import CobroDirectoModal from '../components/CobroDirectoModal';
@@ -56,7 +57,8 @@ export default function CobranzasPage({
   preselectedSocioId, 
   printMode,
   recibos,
-  setRecibos
+  setRecibos,
+  currentUser
 }) {
   // Navigation: 'cobro' (Ventanilla) | 'historial' (Recibos emitidos)
   const [activeSubTab, setActiveSubTab] = useState('cobro');
@@ -186,12 +188,15 @@ export default function CobranzasPage({
       ? new Date().toLocaleString('es-BO') 
       : `${fechaCobro.split('-').reverse().join('/')}, 12:00:00 (Depósito Bancario)`;
 
+    const operadorNombre = currentUser?.nombre || (currentUser?.rol === 'admin' ? 'Administrador Central' : 'Cajero(a) Central');
+    const operadorId = currentUser?.id || currentUser?.usuario || 'admin33';
+
     const receiptData = {
       nroRecibo,
       fecha: fechaHoraFormateada,
       fechaIso: fechaCobro,
-      usuario: 'Cajero Central',
-      cajero: 'Cajero Central',
+      usuario: operadorId,
+      cajero: operadorNombre,
       socioId: activeSocio.id,
       socioNombre: `${activeSocio.nombres} ${activeSocio.apPaterno} ${activeSocio.apMaterno || ''}`.trim(),
       socioCI: activeSocio.ci,
@@ -387,28 +392,39 @@ export default function CobranzasPage({
           </p>
         </div>
 
-        <div className="flex bg-slate-100 p-1 rounded-xl space-x-1 text-xs font-bold">
-          <button
-            onClick={() => setActiveSubTab('cobro')}
-            className={`px-3.5 py-2 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
-              activeSubTab === 'cobro'
-                ? 'bg-emerald-700 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span>💵 Cobranza en Ventanilla</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('historial')}
-            className={`px-3.5 py-2 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
-              activeSubTab === 'historial'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>Historial y Anulación ({historialRecibos.length})</span>
-          </button>
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs">
+            <User className="w-3.5 h-3.5 text-emerald-700" />
+            <span className="text-slate-500">Operador de Cobro:</span>
+            <strong className="text-slate-900">{currentUser?.nombre || (currentUser?.rol === 'admin' ? 'Administrador Central' : 'Cajero(a) Central')}</strong>
+            <span className="bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded uppercase">
+              {currentUser?.rol === 'admin' ? 'Admin / Cobrador' : 'Caja'}
+            </span>
+          </div>
+
+          <div className="flex bg-slate-100 p-1 rounded-xl space-x-1 text-xs font-bold">
+            <button
+              onClick={() => setActiveSubTab('cobro')}
+              className={`px-3.5 py-2 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                activeSubTab === 'cobro'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>💵 Cobranza en Ventanilla</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('historial')}
+              className={`px-3.5 py-2 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                activeSubTab === 'historial'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Historial y Anulación ({historialRecibos.length})</span>
+            </button>
+          </div>
         </div>
       </div>
 

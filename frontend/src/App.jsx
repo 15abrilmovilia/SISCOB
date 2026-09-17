@@ -518,6 +518,7 @@ export default function App() {
               printMode={printMode}
               recibos={recibos}
               setRecibos={setRecibos}
+              currentUser={currentUser}
             />
           )}
           {activeTab === 'egresos' && (
@@ -544,7 +545,10 @@ export default function App() {
             />
           )}
           {activeTab === 'workflow' && (
-            <WorkflowCierrePage />
+            <WorkflowCierrePage 
+              socios={socios}
+              currentUser={currentUser}
+            />
           )}
           {activeTab === 'balance' && (
             <BalancePage 
@@ -587,6 +591,7 @@ export default function App() {
               printMode={printMode}
               setPrintMode={setPrintMode}
               currentUser={currentUser}
+              socios={socios}
             />
           )}
           {activeTab === 'usuarios' && (

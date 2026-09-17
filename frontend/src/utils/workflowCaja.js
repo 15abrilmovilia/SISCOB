@@ -2,19 +2,28 @@
 export const ESTADOS_CIERRE = {
   ABIERTA: 'abierta',
   OPERACIONES_REGISTRADAS: 'operaciones_registradas',
-  CIERRE_SOLICITADO: 'cierre_solicitado',       // Cajera envió → pendiente Secretaría
+  CIERRE_SOLICITADO: 'cierre_solicitado',       // Cajera o Administrador envió → pendiente Secretaría
   REVISADO_SECRETARIA: 'revisado_secretaria',    // Secretaría aprobó → pendiente Tesorero
   APROBADO_TESORERO: 'aprobado_tesorero',        // Tesorero aprobó → pendiente Comisión Revisora
   CONSOLIDADO: 'consolidado',                    // Comisión Revisora dio visto bueno final
   OBSERVADO: 'observado_rechazado'              // Rechazado / Observado para corrección
 };
 
-// Roles del sistema de aprobación
+// Roles del sistema de aprobación (incluyendo Administrador como cobrador)
 export const ROLES_WORKFLOW = {
   CAJERO: 'cajero',                       // 1. Operadora / Cajera de ventanilla
+  ADMIN_COBRADOR: 'admin_cobrador',       // 1.B Administrador cobrando en ventanilla
   SECRETARIA: 'secretaria',               // 2. Secretaría / Administración
   TESORERO: 'tesorero',                   // 3. Tesorero del Sindicato
-  COMISION_REVISORA: 'comision_revisora'  // 4. Comisión Revisora Mensual (socios por sorteo)
+  COMISION_REVISORA: 'comision_revisora'  // 4. Comisión Revisora Mensual (socios por sorteo/asignación)
+};
+
+export const DEFAULT_COMISIONES_MES = {
+  'Septiembre 2026': [
+    { id: 15, nombre: 'JUAN MAMANI CHOQUE', nroMovil: '015', cargo: 'Presidente Comisión', metodo: 'Sorteo de Asamblea' },
+    { id: 42, nombre: 'PEDRO QUISPE VILCA', nroMovil: '042', cargo: 'Secretario Comisión', metodo: 'Sorteo de Asamblea' },
+    { id: 78, nombre: 'ROSA FLORES APARICIO', nroMovil: '078', cargo: 'Vocal Comisión', metodo: 'Asignación Directa' }
+  ]
 };
 
 export const INITIAL_CIERRES = [
@@ -29,9 +38,9 @@ export const INITIAL_CIERRES = [
     secretaria: { id: 'sec01', nombre: 'Ing. Carlos Mendoza', cargo: 'Secretaría de Administración', ip: '192.168.100.5' },
     tesorero: { id: 'tes01', nombre: 'Lic. Ramiro Paredes', cargo: 'Tesorero del Sindicato', ip: '192.168.100.2' },
     comisionRevisora: [
-      { nombre: 'Sr. Juan Mamani', nroMovil: '015', cargo: 'Comisión Revisora' },
-      { nombre: 'Sr. Pedro Quispe', nroMovil: '042', cargo: 'Comisión Revisora' },
-      { nombre: 'Sra. Rosa Flores', nroMovil: '078', cargo: 'Comisión Revisora' }
+      { nombre: 'JUAN MAMANI CHOQUE', nroMovil: '015', cargo: 'Presidente Comisión', metodo: 'Sorteo de Asamblea' },
+      { nombre: 'PEDRO QUISPE VILCA', nroMovil: '042', cargo: 'Secretario Comisión', metodo: 'Sorteo de Asamblea' },
+      { nombre: 'ROSA FLORES APARICIO', nroMovil: '078', cargo: 'Vocal Comisión', metodo: 'Asignación Directa' }
     ],
     estado: ESTADOS_CIERRE.CIERRE_SOLICITADO,
     saldoInicial: 2500.0,
@@ -92,13 +101,13 @@ export const INITIAL_CIERRES = [
     turno: 'Turno Tarde (14:00 - 21:00)',
     fecha: '01/09/2026',
     mesReporte: 'Septiembre 2026',
-    cajero: { id: 'cajero02', nombre: 'Marcos Villegas', cargo: 'Operador / Cajero', ip: '192.168.100.16' },
+    cajero: { id: 'admin01', nombre: 'Ing. Carlos Mendoza', cargo: 'Administrador / Cobrador', ip: '192.168.100.5' },
     secretaria: { id: 'sec01', nombre: 'Ing. Carlos Mendoza', cargo: 'Secretaría de Administración', ip: '192.168.100.5' },
     tesorero: { id: 'tes01', nombre: 'Lic. Ramiro Paredes', cargo: 'Tesorero del Sindicato', ip: '192.168.100.2' },
     comisionRevisora: [
-      { nombre: 'Sr. Juan Mamani', nroMovil: '015', cargo: 'Comisión Revisora' },
-      { nombre: 'Sr. Pedro Quispe', nroMovil: '042', cargo: 'Comisión Revisora' },
-      { nombre: 'Sra. Rosa Flores', nroMovil: '078', cargo: 'Comisión Revisora' }
+      { nombre: 'JUAN MAMANI CHOQUE', nroMovil: '015', cargo: 'Presidente Comisión', metodo: 'Sorteo de Asamblea' },
+      { nombre: 'PEDRO QUISPE VILCA', nroMovil: '042', cargo: 'Secretario Comisión', metodo: 'Sorteo de Asamblea' },
+      { nombre: 'ROSA FLORES APARICIO', nroMovil: '078', cargo: 'Vocal Comisión', metodo: 'Asignación Directa' }
     ],
     estado: ESTADOS_CIERRE.CONSOLIDADO,
     saldoInicial: 6730.0,
@@ -108,16 +117,16 @@ export const INITIAL_CIERRES = [
     efectivoFisicoContado: 9480.0,
     diferencia: 0.0,
     comprobantesValidados: 12,
-    observacionesCajero: 'Corte regular de noche.',
+    observacionesCajero: 'Corte regular de noche operado por Administración Central.',
     observacionesSecretaria: 'Revisión conforme de boletas físicas de cuotas y multas del turno.',
     observacionesTesorero: 'Aprobado conforme. Saldos cuadran con el libro de registro.',
     observacionesComision: 'Comisión Revisora otorga visto bueno. Ingresos y egresos del turno aprobados en sesión.',
     bloqueadoEdicion: true,
     auditoriaLogs: [
-      { id: 10, fecha: '01/09/2026 21:10', usuario: 'Marcos Villegas', rol: 'cajero', cargo: 'Operador / Cajero', ip: '192.168.100.16', accion: 'SOLICITUD_CIERRE', estadoAnterior: ESTADOS_CIERRE.OPERACIONES_REGISTRADAS, estadoNuevo: ESTADOS_CIERRE.CIERRE_SOLICITADO, observacion: 'Cierre de turno enviado a Secretaría' },
+      { id: 10, fecha: '01/09/2026 21:10', usuario: 'Ing. Carlos Mendoza', rol: 'admin_cobrador', cargo: 'Administrador / Cobrador', ip: '192.168.100.5', accion: 'SOLICITUD_CIERRE', estadoAnterior: ESTADOS_CIERRE.OPERACIONES_REGISTRADAS, estadoNuevo: ESTADOS_CIERRE.CIERRE_SOLICITADO, observacion: 'Cierre de turno enviado a Secretaría' },
       { id: 11, fecha: '01/09/2026 21:30', usuario: 'Ing. Carlos Mendoza', rol: 'secretaria', cargo: 'Secretaría de Administración', ip: '192.168.100.5', accion: 'REVISION_SECRETARIA', estadoAnterior: ESTADOS_CIERRE.CIERRE_SOLICITADO, estadoNuevo: ESTADOS_CIERRE.REVISADO_SECRETARIA, observacion: 'Revisado y conforme por Secretaría de Administración' },
       { id: 12, fecha: '01/09/2026 22:00', usuario: 'Lic. Ramiro Paredes', rol: 'tesorero', cargo: 'Tesorero del Sindicato', ip: '192.168.100.2', accion: 'APROBACION_TESORERO', estadoAnterior: ESTADOS_CIERRE.REVISADO_SECRETARIA, estadoNuevo: ESTADOS_CIERRE.APROBADO_TESORERO, observacion: 'Aprobado por el Tesorero General del Sindicato' },
-      { id: 13, fecha: '01/09/2026 22:30', usuario: 'Comisión Revisora — Sr. Juan Mamani (y 2 miembros)', rol: 'comision_revisora', cargo: 'Comisión Revisora Mensual', ip: '192.168.100.20', accion: 'VISTO_BUENO_COMISION', estadoAnterior: ESTADOS_CIERRE.APROBADO_TESORERO, estadoNuevo: ESTADOS_CIERRE.CONSOLIDADO, observacion: 'Comisión Revisora otorga visto bueno. Ingresos y egresos del turno aprobados en sesión.' }
+      { id: 13, fecha: '01/09/2026 22:30', usuario: 'Comisión Revisora (3 socios)', rol: 'comision_revisora', cargo: 'Comisión Revisora Mensual', ip: '192.168.100.20', accion: 'VISTO_BUENO_COMISION', estadoAnterior: ESTADOS_CIERRE.APROBADO_TESORERO, estadoNuevo: ESTADOS_CIERRE.CONSOLIDADO, observacion: 'Comisión Revisora otorga visto bueno. Ingresos y egresos del turno aprobados en sesión.' }
     ]
   }
 ];
