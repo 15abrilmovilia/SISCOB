@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS cajas (
     saldo_anterior NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     ingresos NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     egresos NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    saldo_actual NUMERIC(12, 2) NOT NULL DEFAULT 0.00
+    saldo_actual NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    qr_image TEXT  -- Imagen QR del banco en formato Base64 (Portal del Socio)
 );
 
 -- 3. Tabla de Conceptos y Obligaciones (Cuotas y Multas)
